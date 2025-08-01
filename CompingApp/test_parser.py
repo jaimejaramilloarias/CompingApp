@@ -28,3 +28,16 @@ def test_inversion_limita_salto_de_bajo():
     assert primero == [60, 64, 67, 70]
     assert abs(segundo[0] - primero[0]) <= 5
     assert segundo == [59, 63, 66, 69]
+
+
+def test_rango_de_voces():
+    """La voz superior no debe superar C5 y la inferior no debe bajar de D3."""
+    primero = notas_midi_acorde("C", [0, 4, 7, 11])
+    assert primero[0] >= 50
+    assert max(primero) <= 72
+
+    # Forzar un bajo previo alto para comprobar el límite superior
+    segundo = notas_midi_acorde("F", [0, 4, 7, 11], prev_bajo=65)
+    assert abs(segundo[0] - 65) <= 5
+    assert segundo[0] >= 50
+    assert max(segundo) <= 72
