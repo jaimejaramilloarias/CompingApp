@@ -32,11 +32,40 @@ def expandir_cifrado_a_corcheas(cifrado_texto, total_corcheas=256, corcheas_por_
         resultado = resultado[:total_corcheas]
     return resultado
 
-def notas_midi_acorde(fundamental, grados, base_octava=4):
+def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None):
+    """Devuelve las notas MIDI del acorde aplicando inversiones automáticas.
+
+    Si se proporciona ``prev_bajo`` (la nota más grave del acorde anterior),
+    se elige la inversión y el desplazamiento de octava cuya nota más grave
+    quede a una distancia menor o igual a cinco semitonos de ``prev_bajo``.
+    """
     if fundamental not in notas_naturales:
         fundamental = 'C'
     base = 12 * base_octava + notas_naturales[fundamental]
-    return [base + intervalo for intervalo in grados]
+
+    mejor_inversion = None
+    mejor_dist = None
+
+    for k in range(len(grados)):
+        # Generar inversión moviendo los primeros k grados una octava arriba
+        inv = grados[k:] + [g + 12 for g in grados[:k]]
+        bajo_base = base + inv[0]
+
+        if prev_bajo is None:
+            notas = [base + g for g in inv]
+            mejor_inversion = notas
+            break
+
+        # Desplazar el acorde por octavas para acercar el bajo al acorde previo
+        shift = round((prev_bajo - bajo_base) / 12) * 12
+        for sh in (shift - 12, shift, shift + 12):
+            bajo = bajo_base + sh
+            dist = abs(bajo - prev_bajo)
+            if mejor_dist is None or dist < mejor_dist:
+                mejor_dist = dist
+                mejor_inversion = [base + g + sh for g in inv]
+
+    return mejor_inversion
 
 def enlazar_notas(previas, nuevas):
     """Asigna las notas de ``nuevas`` a ``previas`` minimizando el movimiento.
@@ -84,6 +113,7 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
             cache[a] = analizar_cifrado(a)[0]
         acordes_analizados.append(cache[a])
 
+    bajo_anterior = None
     for i in range(total_corcheas):
         t0 = tiempo_inicio + i * dur_corchea
         t1 = t0 + dur_corchea
@@ -92,7 +122,8 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
         if not notas_corchea:
             continue
         fundamental, grados = acordes_analizados[i]
-        nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4)
+        nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=bajo_anterior)
+        bajo_anterior = nuevas_alturas[0]
         alturas_previas = [n.pitch for n in notas_corchea]
         nuevas = enlazar_notas(alturas_previas, nuevas_alturas)
         for nota, altura in zip(notas_corchea, nuevas):
