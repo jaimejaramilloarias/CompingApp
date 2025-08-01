@@ -49,7 +49,12 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
     tiempo_fin = tiempo_inicio + total_corcheas * dur_corchea
 
     acordes_corchea = expandir_cifrado_a_corcheas(cifrado, total_corcheas, corcheas_por_compas)
-    acordes_analizados = [analizar_cifrado(a)[0] for a in acordes_corchea]
+    cache = {}
+    acordes_analizados = []
+    for a in acordes_corchea:
+        if a not in cache:
+            cache[a] = analizar_cifrado(a)[0]
+        acordes_analizados.append(cache[a])
 
     for i in range(total_corcheas):
         t0 = tiempo_inicio + i * dur_corchea

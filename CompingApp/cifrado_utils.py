@@ -35,16 +35,27 @@ def analizar_cifrado(cifrado):
         sufijo = sufijo.strip()
         extensiones = []
 
-        # Extraer extensiones en paréntesis
-        sufijo_base = sufijo
-        if '(' in sufijo:
-            parentesis = re.findall(r'\((.*?)\)', sufijo)
+        # Detectar la base del acorde antes de procesar extensiones
+        base, resto = alias_a_clave_acordes(sufijo)
+        if not base or base not in acordes:
+            if sufijo == '' or sufijo.startswith('7'):
+                base = '7'
+                resto = sufijo[1:] if sufijo.startswith('7') else ''
+            else:
+                print(f"¡Acorde no reconocido: {sufijo}! Usando 7 por defecto.")
+                base = '7'
+                resto = sufijo
+
+        # Extraer extensiones en paréntesis del resto
+        sufijo_base = resto
+        if '(' in sufijo_base:
+            parentesis = re.findall(r'\((.*?)\)', sufijo_base)
             for contenido in parentesis:
                 for ext in contenido.split(','):
                     ext = ext.strip()
                     if ext:
                         extensiones.append(ext)
-            sufijo_base = re.sub(r'\(.*?\)', '', sufijo).strip()
+            sufijo_base = re.sub(r'\(.*?\)', '', sufijo_base).strip()
 
         # Extraer extensiones pegadas fuera de paréntesis
         for ext_tag in ['b9', '#9', '9', '#11', '11', 'b13', '13']:
@@ -53,13 +64,9 @@ def analizar_cifrado(cifrado):
                 sufijo_base = sufijo_base.replace(ext_tag, '')
 
         sufijo_base = sufijo_base.strip()
-        base, resto_limpio = alias_a_clave_acordes(sufijo_base)
-        if not base or base not in acordes:
-            if sufijo_base == '':
-                base = '7'
-            else:
-                print(f"¡Acorde no reconocido: {sufijo_base}! Usando 7 por defecto.")
-                base = "7"
+        if sufijo_base:
+            print(f"¡Acorde no reconocido: {sufijo_base}! Usando 7 por defecto.")
+
         grados_base = acordes[base][:]
 
         e_9 = next((e for e in extensiones if '9' in e), None)
