@@ -3,24 +3,22 @@ from acordes_dict import acordes
 
 def alias_a_clave_acordes(resto):
     suf = resto.replace(" ", "").replace('[', '(').replace(']', ')').lower()
-    for pat in ["m7(b5)", "m7b5", "min7b5", "mi7b5", "-7b5", "ø7", "ø"]:
-        if suf.startswith(pat):
-            return "m7(b5)", resto[len(pat):]
-    for pat in ["min", "mi", "m", "-"]:
-        if suf.startswith(pat):
-            return "m", resto[len(pat):]
-    for pat in ["maj", "major", "maj", "m", "∆"]:
-        if suf.startswith(pat):
-            return "∆", resto[len(pat):]
-    for pat in ["dim", "º", "o"]:
-        if suf.startswith(pat):
-            return "º", resto[len(pat):]
-    for pat in ["aug", "+"]:
-        if suf.startswith(pat):
-            return "+", resto[len(pat):]
-    for pat in ["sus4", "sus"]:
-        if suf.startswith(pat):
-            return "sus", resto[len(pat):]
+
+    alias_patterns = [
+        ("m7(b5)", ["m7(b5)", "m7b5", "min7b5", "mi7b5", "-7b5", "ø7", "ø"]),
+        ("m6", ["m6"]),
+        ("6", ["6"]),
+        ("m", ["min", "mi", "m", "-"]),
+        ("∆", ["maj", "major", "maj", "m", "∆"]),
+        ("º", ["dim", "º", "o"]),
+        ("+", ["aug", "+"]),
+        ("sus", ["sus4", "sus"]),
+    ]
+
+    for base, pats in alias_patterns:
+        for pat in pats:
+            if suf.startswith(pat):
+                return base, resto[len(pat):]
     return None, resto
 
 def analizar_cifrado(cifrado):

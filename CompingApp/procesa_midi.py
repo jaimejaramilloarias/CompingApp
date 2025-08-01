@@ -1,4 +1,3 @@
-import pretty_midi
 import os
 from acordes_dict import acordes
 from cifrado_utils import analizar_cifrado
@@ -39,6 +38,7 @@ def notas_midi_acorde(fundamental, grados, base_octava=4):
     return [base + intervalo for intervalo in grados]
 
 def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corcheas_por_compas=8, dur_corchea=0.25):
+    import pretty_midi
     midi = pretty_midi.PrettyMIDI(reference_midi_path)
     pista = midi.instruments[0]
     notas = pista.notes
