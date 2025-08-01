@@ -32,12 +32,15 @@ def expandir_cifrado_a_corcheas(cifrado_texto, total_corcheas=256, corcheas_por_
         resultado = resultado[:total_corcheas]
     return resultado
 
-def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None):
-    """Devuelve las notas MIDI del acorde aplicando inversiones automáticas.
+def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, inversion=0):
+    """Devuelve las notas MIDI del acorde.
 
-    Si se proporciona ``prev_bajo`` (la nota más grave del acorde anterior),
-    se elige la inversión y el desplazamiento de octava cuya nota más grave
-    quede a una distancia menor o igual a cinco semitonos de ``prev_bajo``.
+    Si ``prev_bajo`` es ``None`` se utiliza la inversión indicada por
+    ``inversion`` (0=fundamental, 1=1ª inversión, ...).  Para los acordes
+    siguientes se elige automáticamente la inversión y el desplazamiento de
+    octava cuya nota más grave quede lo más cercana posible a ``prev_bajo``.
+    El resultado siempre contiene cuatro notas, duplicando la más aguda si el
+    acorde original tiene menos voces.
     """
     if fundamental not in notas_naturales:
         fundamental = 'C'
@@ -46,24 +49,24 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None):
     mejor_inversion = None
     mejor_dist = None
 
-    for k in range(len(grados)):
-        # Generar inversión moviendo los primeros k grados una octava arriba
+    if prev_bajo is None:
+        k = inversion % len(grados)
         inv = grados[k:] + [g + 12 for g in grados[:k]]
-        bajo_base = base + inv[0]
+        mejor_inversion = [base + g for g in inv]
+    else:
+        for k in range(len(grados)):
+            # Generar inversión moviendo los primeros k grados una octava arriba
+            inv = grados[k:] + [g + 12 for g in grados[:k]]
+            bajo_base = base + inv[0]
 
-        if prev_bajo is None:
-            notas = [base + g for g in inv]
-            mejor_inversion = notas
-            break
-
-        # Desplazar el acorde por octavas para acercar el bajo al acorde previo
-        shift = round((prev_bajo - bajo_base) / 12) * 12
-        for sh in (shift - 12, shift, shift + 12):
-            bajo = bajo_base + sh
-            dist = abs(bajo - prev_bajo)
-            if mejor_dist is None or dist < mejor_dist:
-                mejor_dist = dist
-                mejor_inversion = [base + g + sh for g in inv]
+            # Desplazar el acorde por octavas para acercar el bajo al acorde previo
+            shift = round((prev_bajo - bajo_base) / 12) * 12
+            for sh in (shift - 12, shift, shift + 12):
+                bajo = bajo_base + sh
+                dist = abs(bajo - prev_bajo)
+                if mejor_dist is None or dist < mejor_dist:
+                    mejor_dist = dist
+                    mejor_inversion = [base + g + sh for g in inv]
 
     # Ajustar para que el bajo no salte más de cinco semitonos
     if mejor_inversion and prev_bajo is not None:
@@ -88,6 +91,10 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None):
             if prev_bajo is None or abs(candidato[0] - prev_bajo) <= 5:
                 mejor_inversion = candidato
                 bajo = mejor_inversion[0]
+
+    if mejor_inversion:
+        while len(mejor_inversion) < 4:
+            mejor_inversion.append(mejor_inversion[-1] + 12)
 
     return mejor_inversion
 
@@ -118,7 +125,7 @@ def enlazar_notas(previas, nuevas):
 
     return list(mejor_asignacion)
 
-def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corcheas_por_compas=8, dur_corchea=0.25):
+def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corcheas_por_compas=8, dur_corchea=0.25, inversion_inicial=0):
     import pretty_midi
     midi = pretty_midi.PrettyMIDI(reference_midi_path)
     pista = midi.instruments[0]
@@ -150,9 +157,25 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
 
         if len(notas_corchea) > 4:
             notas_corchea = notas_corchea[:4]
+        elif len(notas_corchea) < 4:
+            # Duplicar notas existentes para garantizar cuatro eventos
+            base_nota = notas_corchea[0]
+            for _ in range(4 - len(notas_corchea)):
+                nueva = pretty_midi.Note(velocity=base_nota.velocity,
+                                         pitch=base_nota.pitch,
+                                         start=t0,
+                                         end=t1)
+                notas.append(nueva)
+                notas_corchea.append(nueva)
 
         fundamental, grados = acordes_analizados[i]
-        nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=bajo_anterior)
+        if i == 0:
+            nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4,
+                                               prev_bajo=bajo_anterior,
+                                               inversion=inversion_inicial)
+        else:
+            nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4,
+                                               prev_bajo=bajo_anterior)
         bajo_anterior = nuevas_alturas[0]
         alturas_previas = [n.pitch for n in notas_corchea]
         nuevas = enlazar_notas(alturas_previas, nuevas_alturas)
