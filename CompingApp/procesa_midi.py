@@ -39,21 +39,16 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, invers
     ``inversion`` (0=fundamental, 1=1ª inversión, ...).  Para los acordes
     siguientes se elige automáticamente la inversión y el desplazamiento de
     octava cuya nota más grave quede lo más cercana posible a ``prev_bajo``.
-    El resultado siempre contiene cuatro notas en posición cerrada, duplicando
-    la fundamental a la octava superior si el acorde original tiene menos
-    voces.
+    El resultado siempre contiene cuatro notas en posición cerrada. ``grados``
+    debe describir exactamente cuatro alturas distintas del acorde.
     """
     if fundamental not in notas_naturales:
         fundamental = 'C'
     base = 12 * base_octava + notas_naturales[fundamental]
 
-    # Asegurar que siempre trabajamos con cuatro grados.  Si el acorde es una
-    # tríada se duplica la fundamental a la octava.
     grados = list(grados)
-    if len(grados) < 4:
-        grados = grados + [grados[0] + 12]
-    else:
-        grados = grados[:4]
+    if len(grados) != 4:
+        raise ValueError("Se requieren cuatro grados para construir el acorde")
 
     mejor_inversion = None
     mejor_dist = None
@@ -102,8 +97,7 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, invers
                 bajo = mejor_inversion[0]
 
     if mejor_inversion:
-        if len(mejor_inversion) < 4:
-            mejor_inversion += [mejor_inversion[0] + 12] * (4 - len(mejor_inversion))
+        mejor_inversion.sort()
         while max(mejor_inversion) - min(mejor_inversion) > 12:
             max_idx = mejor_inversion.index(max(mejor_inversion))
             mejor_inversion[max_idx] -= 12

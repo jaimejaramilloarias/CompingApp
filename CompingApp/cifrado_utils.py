@@ -35,6 +35,14 @@ def analizar_cifrado(cifrado):
 
         # Detectar la base del acorde antes de procesar extensiones
         base, resto = alias_a_clave_acordes(sufijo)
+        if base == 'm':
+            base = 'm7'
+        elif base == '+':
+            base = '+7'
+        elif base == 'º':
+            base = 'º7'
+        elif base == 'sus':
+            base = '7sus4'
         if not base or base not in acordes:
             if sufijo == '' or sufijo.startswith('7'):
                 base = '7'
@@ -77,19 +85,16 @@ def analizar_cifrado(cifrado):
             "13": 9, "b13": 8
         }
 
-        grados_final = grados_base[:]
-        if e_11 and e_13:
-            grados_final[0] = ext_map.get(e_9 or "9", 2)
-            grados_final[1] = ext_map.get(e_11, 5)
-            grados_final[2] = ext_map.get(e_13, 9)
-        elif e_13:
-            grados_final[0] = ext_map.get(e_9 or "9", 2)
-            grados_final[2] = ext_map.get(e_13, 9)
-        elif e_11:
-            grados_final[0] = ext_map.get(e_9 or "9", 2)
-            grados_final[2] = ext_map.get(e_11, 5)
-        elif e_9:
-            grados_final[0] = ext_map.get(e_9, 2)
+        if e_13 or e_11 or e_9:
+            grados_final = [grados_base[0], grados_base[1], grados_base[3]]
+            if e_13:
+                grados_final.append(ext_map.get(e_13, 9))
+            elif e_11:
+                grados_final.append(ext_map.get(e_11, 5))
+            else:
+                grados_final.append(ext_map.get(e_9, 2))
+        else:
+            grados_final = grados_base[:]
 
         resultado.append((fundamental, grados_final))
     return resultado
