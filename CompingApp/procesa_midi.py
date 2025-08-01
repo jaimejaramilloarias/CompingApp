@@ -185,11 +185,31 @@ def enlazar_notas(previas, nuevas):
 
     return list(mejor_asignacion)
 
-def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corcheas_por_compas=8, dur_corchea=0.25, inversion_inicial=0):
+def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corcheas_por_compas=8, dur_corchea=0.25, rotacion=0):
     import pretty_midi
+    from collections import defaultdict
     midi = pretty_midi.PrettyMIDI(reference_midi_path)
     pista = midi.instruments[0]
     notas = pista.notes
+
+    if rotacion:
+        grupos = defaultdict(list)
+        for n in notas:
+            grupos[n.start].append(n)
+        if rotacion > 0:
+            for _ in range(rotacion):
+                for g in grupos.values():
+                    bajo = min(n.pitch for n in g)
+                    for n in g:
+                        if n.pitch == bajo:
+                            n.pitch += 12
+        else:
+            for _ in range(-rotacion):
+                for g in grupos.values():
+                    alto = max(n.pitch for n in g)
+                    for n in g:
+                        if n.pitch == alto:
+                            n.pitch -= 12
 
     compases = [c.strip() for c in cifrado.split('|') if c.strip()]
     total_corcheas = len(compases) * corcheas_por_compas
@@ -232,7 +252,7 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
         if i == 0:
             nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4,
                                                prev_bajo=bajo_anterior,
-                                               inversion=inversion_inicial)
+                                               inversion=0)
         else:
             nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4,
                                                prev_bajo=bajo_anterior)
