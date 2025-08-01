@@ -1,5 +1,5 @@
 from cifrado_utils import analizar_cifrado
-from procesa_midi import notas_midi_acorde
+from procesa_midi import notas_midi_acorde, enlazar_notas
 
 
 def test_m7b5_aliases():
@@ -14,3 +14,9 @@ def test_6_9_parsing_and_midi():
     esperado = ("C", [2, 4, 7, 9])
     assert analizar_cifrado(cifrado) == [esperado]
     assert notas_midi_acorde(*esperado) == [50, 52, 55, 57]
+
+
+def test_enlazar_notas_minimo_movimiento():
+    previas = [72, 60, 64, 67]
+    nuevas = [60, 64, 67, 71]
+    assert enlazar_notas(previas, nuevas) == [71, 60, 64, 67]
