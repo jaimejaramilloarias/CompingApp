@@ -65,6 +65,16 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None):
                 mejor_dist = dist
                 mejor_inversion = [base + g + sh for g in inv]
 
+    # Limitar el bajo entre D3 (50) y D4 (62) moviendo el acorde por octavas
+    if mejor_inversion:
+        bajo = mejor_inversion[0]
+        while bajo < 50:
+            mejor_inversion = [n + 12 for n in mejor_inversion]
+            bajo += 12
+        while bajo > 62:
+            mejor_inversion = [n - 12 for n in mejor_inversion]
+            bajo -= 12
+
     return mejor_inversion
 
 def enlazar_notas(previas, nuevas):
@@ -119,8 +129,18 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
         t1 = t0 + dur_corchea
         # Nuevo filtrado para incluir notas activas en el segmento (no solo las que inician)
         notas_corchea = [n for n in notas if not (n.end <= t0 or n.start >= t1)]
-        if not notas_corchea:
-            continue
+
+        # Garantizar que cada acorde tenga exactamente cuatro notas
+        if len(notas_corchea) < 4:
+            velocity = notas_corchea[0].velocity if notas_corchea else 80
+            for _ in range(4 - len(notas_corchea)):
+                nueva = pretty_midi.Note(velocity=velocity, pitch=60, start=t0, end=t1)
+                pista.notes.append(nueva)
+                notas.append(nueva)
+                notas_corchea.append(nueva)
+        elif len(notas_corchea) > 4:
+            notas_corchea = notas_corchea[:4]
+
         fundamental, grados = acordes_analizados[i]
         nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=bajo_anterior)
         bajo_anterior = nuevas_alturas[0]
