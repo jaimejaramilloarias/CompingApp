@@ -20,3 +20,10 @@ def test_enlazar_notas_minimo_movimiento():
     previas = [72, 60, 64, 67]
     nuevas = [60, 64, 67, 71]
     assert enlazar_notas(previas, nuevas) == [71, 60, 64, 67]
+
+
+def test_inversion_limita_salto_de_bajo():
+    primero = notas_midi_acorde("C", [0, 4, 7])
+    segundo = notas_midi_acorde("B", [0, 4, 7], prev_bajo=primero[0])
+    assert abs(segundo[0] - primero[0]) <= 5
+    assert segundo == [47, 51, 54]
