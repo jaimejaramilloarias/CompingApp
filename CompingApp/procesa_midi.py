@@ -39,8 +39,9 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, invers
     ``inversion`` (0=fundamental, 1=1ª inversión, ...).  Para los acordes
     siguientes se elige automáticamente la inversión y el desplazamiento de
     octava cuya nota más grave quede lo más cercana posible a ``prev_bajo``.
-    El resultado siempre contiene cuatro notas en posición cerrada. ``grados``
-    debe describir exactamente cuatro alturas distintas del acorde.
+    El resultado siempre contiene cuatro notas en posición cerrada dentro del
+    registro D3–C5. ``grados`` debe describir exactamente cuatro alturas
+    distintas del acorde.
     """
     if fundamental not in notas_naturales:
         fundamental = 'C'
@@ -56,21 +57,40 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, invers
     if prev_bajo is None:
         k = inversion % len(grados)
         inv = grados[k:] + [g + 12 for g in grados[:k]]
-        mejor_inversion = [base + g for g in inv]
+        candidatos = []
+        for sh in range(-2, 3):
+            cand = [base + g + 12 * sh for g in inv]
+            if cand[0] < 50 or max(cand) > 72:
+                continue
+            candidatos.append(cand)
+        if candidatos:
+            mejor_inversion = candidatos[0]
+        else:
+            mejor_inversion = [base + g for g in inv]
     else:
         for k in range(len(grados)):
-            # Generar inversión moviendo los primeros k grados una octava arriba
             inv = grados[k:] + [g + 12 for g in grados[:k]]
-            bajo_base = base + inv[0]
-
-            # Desplazar el acorde por octavas para acercar el bajo al acorde previo
-            shift = round((prev_bajo - bajo_base) / 12) * 12
-            for sh in (shift - 12, shift, shift + 12):
-                bajo = bajo_base + sh
-                dist = abs(bajo - prev_bajo)
+            for sh in range(-2, 3):
+                cand = [base + g + 12 * sh for g in inv]
+                if cand[0] < 50 or max(cand) > 72:
+                    continue
+                dist = abs(cand[0] - prev_bajo)
+                if dist > 5:
+                    continue
                 if mejor_dist is None or dist < mejor_dist:
                     mejor_dist = dist
-                    mejor_inversion = [base + g + sh for g in inv]
+                    mejor_inversion = cand
+        if mejor_inversion is None:
+            for k in range(len(grados)):
+                inv = grados[k:] + [g + 12 for g in grados[:k]]
+                for sh in range(-2, 3):
+                    cand = [base + g + 12 * sh for g in inv]
+                    if cand[0] < 50 or max(cand) > 72:
+                        continue
+                    dist = abs(cand[0] - prev_bajo)
+                    if mejor_dist is None or dist < mejor_dist:
+                        mejor_dist = dist
+                        mejor_inversion = cand
 
     # Ajustar para que el bajo no salte más de cinco semitonos
     if mejor_inversion and prev_bajo is not None:
@@ -82,7 +102,11 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, invers
                 mejor_inversion = [n - 12 for n in mejor_inversion]
             bajo = mejor_inversion[0]
 
-    # Limitar el bajo entre D3 (50) y D4 (62) sin exceder salto de cinco semitonos
+    # Limitar el registro de los acordes.
+    # El bajo no debe caer por debajo de D3 (50) y la voz superior
+    # no debe superar C5 (72).  Cualquier ajuste de octava respeta además
+    # la restricción de que el bajo solo puede moverse un máximo de cinco
+    # semitonos respecto al acorde anterior.
     if mejor_inversion:
         bajo = mejor_inversion[0]
         if bajo < 50:
@@ -90,10 +114,25 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, invers
             if prev_bajo is None or abs(candidato[0] - prev_bajo) <= 5:
                 mejor_inversion = candidato
                 bajo = mejor_inversion[0]
-        if bajo > 62:
+
+        alto = max(mejor_inversion)
+        if alto > 72:
             candidato = [n - 12 for n in mejor_inversion]
-            if prev_bajo is None or abs(candidato[0] - prev_bajo) <= 5:
+            if candidato[0] >= 50 and (
+                prev_bajo is None or abs(candidato[0] - prev_bajo) <= 5
+            ):
                 mejor_inversion = candidato
+                bajo = mejor_inversion[0]
+
+        # Tras los posibles ajustes de registro, garantizar nuevamente que el
+        # salto del bajo no exceda cinco semitonos.
+        if prev_bajo is not None:
+            bajo = mejor_inversion[0]
+            while abs(bajo - prev_bajo) > 5:
+                if bajo < prev_bajo:
+                    mejor_inversion = [n + 12 for n in mejor_inversion]
+                else:
+                    mejor_inversion = [n - 12 for n in mejor_inversion]
                 bajo = mejor_inversion[0]
 
     if mejor_inversion:
