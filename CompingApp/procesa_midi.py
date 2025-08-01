@@ -1,4 +1,5 @@
 import os
+import itertools
 from acordes_dict import acordes
 from cifrado_utils import analizar_cifrado
 
@@ -37,6 +38,33 @@ def notas_midi_acorde(fundamental, grados, base_octava=4):
     base = 12 * base_octava + notas_naturales[fundamental]
     return [base + intervalo for intervalo in grados]
 
+def enlazar_notas(previas, nuevas):
+    """Asigna las notas de ``nuevas`` a ``previas`` minimizando el movimiento.
+
+    ``previas`` y ``nuevas`` son listas de alturas MIDI (enteros).  El resultado
+    es una nueva lista con la misma longitud que ``previas`` donde cada elemento
+    corresponde a la altura del acorde destino más cercana posible a la nota
+    previa, evitando reutilizar alturas cuando sea posible.
+    """
+    if not previas:
+        return []
+
+    n_prev = len(previas)
+    if len(nuevas) >= n_prev:
+        candidatos = itertools.permutations(nuevas, n_prev)
+    else:
+        candidatos = itertools.product(nuevas, repeat=n_prev)
+
+    mejor_asignacion = None
+    mejor_costo = None
+    for cand in candidatos:
+        costo = sum(abs(p - q) for p, q in zip(cand, previas))
+        if mejor_costo is None or costo < mejor_costo:
+            mejor_costo = costo
+            mejor_asignacion = cand
+
+    return list(mejor_asignacion)
+
 def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corcheas_por_compas=8, dur_corchea=0.25):
     import pretty_midi
     midi = pretty_midi.PrettyMIDI(reference_midi_path)
@@ -65,14 +93,10 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
             continue
         fundamental, grados = acordes_analizados[i]
         nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4)
-        usadas = []
-        for nota in notas_corchea:
-            disponibles = [p for p in nuevas_alturas if p not in usadas]
-            if not disponibles:
-                disponibles = nuevas_alturas
-            mejor = min(disponibles, key=lambda x: abs(nota.pitch - x))
-            nota.pitch = mejor
-            usadas.append(mejor)
+        alturas_previas = [n.pitch for n in notas_corchea]
+        nuevas = enlazar_notas(alturas_previas, nuevas_alturas)
+        for nota, altura in zip(notas_corchea, nuevas):
+            nota.pitch = altura
 
     pista.notes = [n for n in notas if n.start >= tiempo_inicio and n.start < tiempo_fin]
 
