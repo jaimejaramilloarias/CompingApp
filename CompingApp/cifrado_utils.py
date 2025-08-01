@@ -48,9 +48,14 @@ def analizar_cifrado(cifrado):
                 base = '7'
                 resto = sufijo[1:] if sufijo.startswith('7') else ''
             else:
-                print(f"¡Acorde no reconocido: {sufijo}! Usando 7 por defecto.")
                 base = '7'
                 resto = sufijo
+                conocidos = ['b9', '#9', '9', '#11', '11', 'b13', '13']
+                if not any(tag in sufijo for tag in conocidos):
+                    print(f"¡Acorde no reconocido: {sufijo}! Usando 7 por defecto.")
+
+        if resto.startswith('7'):
+            resto = resto[1:]
 
         # Extraer extensiones en paréntesis del resto
         sufijo_base = resto
@@ -85,16 +90,15 @@ def analizar_cifrado(cifrado):
             "13": 9, "b13": 8
         }
 
-        if e_13 or e_11 or e_9:
-            grados_final = [grados_base[0], grados_base[1], grados_base[3]]
-            if e_13:
-                grados_final.append(ext_map.get(e_13, 9))
-            elif e_11:
-                grados_final.append(ext_map.get(e_11, 5))
-            else:
-                grados_final.append(ext_map.get(e_9, 2))
-        else:
-            grados_final = grados_base[:]
+        grados_final = grados_base[:]
+        if e_13:
+            grados_final[2] = ext_map.get(e_13, 9)
+            grados_final[0] = ext_map.get(e_9, 2)
+        elif e_11:
+            grados_final[1] = ext_map.get(e_11, 5)
+            grados_final[0] = ext_map.get(e_9, 2)
+        elif e_9:
+            grados_final[0] = ext_map.get(e_9, 2)
 
         resultado.append((fundamental, grados_final))
     return resultado
