@@ -65,15 +65,29 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None):
                 mejor_dist = dist
                 mejor_inversion = [base + g + sh for g in inv]
 
-    # Limitar el bajo entre D3 (50) y D4 (62) moviendo el acorde por octavas
+    # Ajustar para que el bajo no salte más de cinco semitonos
+    if mejor_inversion and prev_bajo is not None:
+        bajo = mejor_inversion[0]
+        while abs(bajo - prev_bajo) > 5:
+            if bajo < prev_bajo:
+                mejor_inversion = [n + 12 for n in mejor_inversion]
+            else:
+                mejor_inversion = [n - 12 for n in mejor_inversion]
+            bajo = mejor_inversion[0]
+
+    # Limitar el bajo entre D3 (50) y D4 (62) sin exceder salto de cinco semitonos
     if mejor_inversion:
         bajo = mejor_inversion[0]
-        while bajo < 50:
-            mejor_inversion = [n + 12 for n in mejor_inversion]
-            bajo += 12
-        while bajo > 62:
-            mejor_inversion = [n - 12 for n in mejor_inversion]
-            bajo -= 12
+        if bajo < 50:
+            candidato = [n + 12 for n in mejor_inversion]
+            if prev_bajo is None or abs(candidato[0] - prev_bajo) <= 5:
+                mejor_inversion = candidato
+                bajo = mejor_inversion[0]
+        if bajo > 62:
+            candidato = [n - 12 for n in mejor_inversion]
+            if prev_bajo is None or abs(candidato[0] - prev_bajo) <= 5:
+                mejor_inversion = candidato
+                bajo = mejor_inversion[0]
 
     return mejor_inversion
 
@@ -130,15 +144,11 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
         # Nuevo filtrado para incluir notas activas en el segmento (no solo las que inician)
         notas_corchea = [n for n in notas if not (n.end <= t0 or n.start >= t1)]
 
-        # Garantizar que cada acorde tenga exactamente cuatro notas
-        if len(notas_corchea) < 4:
-            velocity = notas_corchea[0].velocity if notas_corchea else 80
-            for _ in range(4 - len(notas_corchea)):
-                nueva = pretty_midi.Note(velocity=velocity, pitch=60, start=t0, end=t1)
-                pista.notes.append(nueva)
-                notas.append(nueva)
-                notas_corchea.append(nueva)
-        elif len(notas_corchea) > 4:
+        # Mantener silencios del midi de referencia
+        if not notas_corchea:
+            continue
+
+        if len(notas_corchea) > 4:
             notas_corchea = notas_corchea[:4]
 
         fundamental, grados = acordes_analizados[i]
