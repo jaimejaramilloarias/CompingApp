@@ -11,9 +11,25 @@ def test_m7b5_aliases():
 
 def test_6_9_parsing_and_midi():
     cifrado = "C6(9)"
-    esperado = ("C", [0, 4, 9, 2])
+    esperado = ("C", [2, 4, 7, 9])
     assert analizar_cifrado(cifrado) == [esperado]
-    assert notas_midi_acorde(*esperado) == [60, 62, 64, 69]
+    assert notas_midi_acorde(*esperado) == [50, 52, 55, 57]
+
+
+def test_extensiones_reemplazan_notas():
+    nombres = {0: 'C', 1: 'Db', 2: 'D', 3: 'Eb', 4: 'E', 5: 'F', 6: 'Gb', 7: 'G', 8: 'Ab', 9: 'A', 10: 'Bb', 11: 'B'}
+    cifrados = ["Dm7(9)", "G13", "C∆(9)", "C6(9)"]
+    esperados = [
+        ['E', 'F', 'A', 'C'],
+        ['A', 'B', 'E', 'F'],
+        ['D', 'E', 'G', 'B'],
+        ['D', 'E', 'G', 'A'],
+    ]
+    for cif, notas_esp in zip(cifrados, esperados):
+        fund, grados = analizar_cifrado(cif)[0]
+        midi = notas_midi_acorde(fund, grados)
+        notas = [nombres[n % 12] for n in midi]
+        assert sorted(notas) == sorted(notas_esp)
 
 
 def test_enlazar_notas_minimo_movimiento():
