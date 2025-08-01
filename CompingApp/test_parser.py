@@ -11,9 +11,9 @@ def test_m7b5_aliases():
 
 def test_6_9_parsing_and_midi():
     cifrado = "C6(9)"
-    esperado = ("C", [2, 4, 7, 9])
+    esperado = ("C", [0, 4, 9, 2])
     assert analizar_cifrado(cifrado) == [esperado]
-    assert notas_midi_acorde(*esperado) == [50, 52, 55, 57]
+    assert notas_midi_acorde(*esperado) == [60, 62, 64, 69]
 
 
 def test_enlazar_notas_minimo_movimiento():
@@ -23,8 +23,8 @@ def test_enlazar_notas_minimo_movimiento():
 
 
 def test_inversion_limita_salto_de_bajo():
-    primero = notas_midi_acorde("C", [0, 4, 7])
-    segundo = notas_midi_acorde("B", [0, 4, 7], prev_bajo=primero[0])
-    assert primero == [60, 64, 67, 72]
+    primero = notas_midi_acorde("C", [0, 4, 7, 10])
+    segundo = notas_midi_acorde("B", [0, 4, 7, 10], prev_bajo=primero[0])
+    assert primero == [60, 64, 67, 70]
     assert abs(segundo[0] - primero[0]) <= 5
-    assert segundo == [59, 63, 66, 71]
+    assert segundo == [59, 63, 66, 69]
