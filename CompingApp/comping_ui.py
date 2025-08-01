@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 import os
 from procesa_midi import procesa_midi
 
@@ -17,15 +17,28 @@ class MidiApp(tk.Tk):
         self.midi_label = tk.Label(self, text="Archivo MIDI de referencia: reference_comping.mid")
         self.midi_label.pack(pady=10)
 
-        self.inv_label = tk.Label(self, text="Inversión inicial del acorde:")
-        self.inv_label.pack()
-        self.inversion = ttk.Combobox(self, state="readonly")
-        self.inversion['values'] = ("fundamental", "primera inversión", "segunda inversión", "tercera inversión")
-        self.inversion.current(0)
-        self.inversion.pack(pady=5)
+        self.rotacion = 0
+        self.rot_label = tk.Label(self, text="Rotar: 0")
+        self.rot_label.pack()
+        self.rot_frame = tk.Frame(self)
+        self.rot_frame.pack(pady=5)
+        self.rot_minus = tk.Button(self.rot_frame, text="-", command=self.rotar_menos)
+        self.rot_minus.pack(side="left")
+        self.rot_plus = tk.Button(self.rot_frame, text="+", command=self.rotar_mas)
+        self.rot_plus.pack(side="left")
 
         self.export_btn = tk.Button(self, text="Exportar MIDI", command=self.export_midi)
         self.export_btn.pack(pady=20)
+
+    def rotar_mas(self):
+        if self.rotacion < 3:
+            self.rotacion += 1
+            self.rot_label.config(text=f"Rotar: {self.rotacion:+d}")
+
+    def rotar_menos(self):
+        if self.rotacion > -3:
+            self.rotacion -= 1
+            self.rot_label.config(text=f"Rotar: {self.rotacion:+d}")
 
     def export_midi(self):
         cifrado = self.cifrado_entry.get("1.0", tk.END).strip()
@@ -36,8 +49,7 @@ class MidiApp(tk.Tk):
             messagebox.showerror("Error", "No se encontró 'reference_comping.mid' en esta carpeta.")
             return
         try:
-            inversion_idx = self.inversion.current()
-            out_path = procesa_midi("reference_comping.mid", cifrado, inversion_inicial=inversion_idx)
+            out_path = procesa_midi("reference_comping.mid", cifrado, rotacion=self.rotacion)
             messagebox.showinfo("¡Listo!", f"Archivo exportado:\n{out_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
