@@ -95,7 +95,17 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, invers
     # Ajustar para que el bajo no salte más de cinco semitonos
     if mejor_inversion and prev_bajo is not None:
         bajo = mejor_inversion[0]
+        visitados = set()
+        # En algunos casos no es posible reducir la distancia a cinco
+        # semitonos únicamente desplazando por octavas.  El bucle original
+        # intentaba hacerlo indefinidamente, provocando un bucle infinito
+        # cuando la diferencia se alternaba entre dos valores (por ejemplo
+        # 6 y -6).  Para evitarlo, registramos las alturas visitadas y
+        # abandonamos si no se logra mejorar.
         while abs(bajo - prev_bajo) > 5:
+            if bajo in visitados:
+                break
+            visitados.add(bajo)
             if bajo < prev_bajo:
                 mejor_inversion = [n + 12 for n in mejor_inversion]
             else:
@@ -128,7 +138,11 @@ def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, invers
         # salto del bajo no exceda cinco semitonos.
         if prev_bajo is not None:
             bajo = mejor_inversion[0]
+            visitados = set()
             while abs(bajo - prev_bajo) > 5:
+                if bajo in visitados:
+                    break
+                visitados.add(bajo)
                 if bajo < prev_bajo:
                     mejor_inversion = [n + 12 for n in mejor_inversion]
                 else:
