@@ -205,6 +205,23 @@ def evitar_solapamientos(notas, margen=0.01):
             actual.end = nuevo_fin
 
 
+def recortar_notas_a_segmento(notas, inicio, fin):
+    """Recorta notas para que se mantengan dentro del segmento ``[inicio, fin]``.
+
+    Solo se acortan las notas; nunca se extienden. Si el inicio queda por
+    encima del final tras el recorte, se ajusta el final para que coincida con
+    el inicio.
+    """
+    for n in notas:
+        if n.start < inicio:
+            n.start = inicio
+        if n.end > fin:
+            n.end = fin
+        if n.end < n.start:
+            n.end = n.start
+    return notas
+
+
 def aplicar_rotaciones(notas, rotacion=0, rotaciones=None):
     """Aplica rotaciones de inversión a listas de notas.
 
@@ -294,6 +311,9 @@ def procesa_midi(
                                          end=t1)
                 notas.append(nueva)
                 notas_corchea.append(nueva)
+
+        # Evitar legato forzando las notas a encajar en los límites del segmento
+        recortar_notas_a_segmento(notas_corchea, t0, t1)
 
         fundamental, grados = acordes_analizados[i]
         if i == 0:
