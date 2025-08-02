@@ -32,6 +32,20 @@ def test_extensiones_reemplazan_notas():
         assert sorted(notas) == sorted(notas_esp)
 
 
+def test_extensiones_combinadas_generan_notas_correctas():
+    casos = [
+        ("A7(b9)#11", {10: 'Bb', 1: 'C#', 3: 'D#', 7: 'G'}),
+        ("D7(#9)b13", {5: 'E#', 6: 'F#', 10: 'Bb', 0: 'C'}),
+        ("Dm7(b5)9", {4: 'E', 5: 'F', 8: 'Ab', 0: 'C'}),
+        ("Ebm7(11)", {5: 'F', 6: 'Gb', 8: 'Ab', 1: 'Db'}),
+    ]
+    for cif, mapa in casos:
+        fund, grados = analizar_cifrado(cif)[0]
+        midi = notas_midi_acorde(fund, grados)
+        notas = [mapa[n % 12] for n in midi]
+        assert sorted(notas) == sorted(mapa.values())
+
+
 def test_enlazar_notas_minimo_movimiento():
     previas = [72, 60, 64, 67]
     nuevas = [60, 64, 67, 71]

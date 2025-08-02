@@ -95,7 +95,7 @@ def analizar_cifrado(cifrado):
             grados_final[2] = ext_map.get(e_13, 9)
             grados_final[0] = ext_map.get(e_9, 2)
         elif e_11:
-            grados_final[1] = ext_map.get(e_11, 5)
+            grados_final[2] = ext_map.get(e_11, 5)
             grados_final[0] = ext_map.get(e_9, 2)
         elif e_9:
             grados_final[0] = ext_map.get(e_9, 2)
