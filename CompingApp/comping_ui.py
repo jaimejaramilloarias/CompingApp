@@ -34,6 +34,9 @@ class MidiApp(tk.Tk):
         self.rot_plus = tk.Button(self.rot_frame, text="+", command=self.rotar_mas)
         self.rot_plus.pack(side="left")
 
+        self.reset_btn = tk.Button(self, text="Reestablecer", command=self.reset_rotaciones)
+        self.reset_btn.pack(pady=5)
+
         self.port_label = tk.Label(self, text="Puerto MIDI de salida:")
         self.port_label.pack(pady=5)
         self.port_combo = ttk.Combobox(self, state="readonly")
@@ -59,6 +62,10 @@ class MidiApp(tk.Tk):
             sel_start = sel_end = None
 
         if sel_start and sel_end:
+            if not self._seleccion_de_acordes_completa(sel_start, sel_end):
+                sel_start = sel_end = None
+
+        if sel_start and sel_end:
             antes = self.cifrado_entry.get("1.0", sel_start)
             seleccion = self.cifrado_entry.get(sel_start, sel_end)
             n_antes = len([c for c in antes.replace("|", " ").split() if c])
@@ -76,6 +83,22 @@ class MidiApp(tk.Tk):
             if -3 <= nueva <= 3:
                 self.rotacion = nueva
                 self.rot_label.config(text=f"Rotar: {self.rotacion:+d}")
+
+    def _seleccion_de_acordes_completa(self, start, end):
+        if not self.cifrado_entry.compare(start, "==", "1.0"):
+            prev = self.cifrado_entry.get(f"{start} -1c")
+            if prev not in (" ", "|", "\n"):
+                return False
+        if not self.cifrado_entry.compare(end, "==", "end") and not self.cifrado_entry.compare(end, "==", "end-1c"):
+            after = self.cifrado_entry.get(end)
+            if after not in (" ", "|", "\n"):
+                return False
+        return True
+
+    def reset_rotaciones(self):
+        self.rotacion = 0
+        self.rotaciones_forzadas.clear()
+        self.rot_label.config(text="Rotar: 0")
 
     def rotar_mas(self):
         self._rotar_seleccion(1)
