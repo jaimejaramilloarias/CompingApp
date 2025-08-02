@@ -192,25 +192,6 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
     pista = midi.instruments[0]
     notas = pista.notes
 
-    if rotacion:
-        grupos = defaultdict(list)
-        for n in notas:
-            grupos[n.start].append(n)
-        if rotacion > 0:
-            for _ in range(rotacion):
-                for g in grupos.values():
-                    bajo = min(n.pitch for n in g)
-                    for n in g:
-                        if n.pitch == bajo:
-                            n.pitch += 12
-        else:
-            for _ in range(-rotacion):
-                for g in grupos.values():
-                    alto = max(n.pitch for n in g)
-                    for n in g:
-                        if n.pitch == alto:
-                            n.pitch -= 12
-
     compases = [c.strip() for c in cifrado.split('|') if c.strip()]
     total_corcheas = len(compases) * corcheas_por_compas
     tiempo_inicio = min(n.start for n in notas)
@@ -250,19 +231,44 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
 
         fundamental, grados = acordes_analizados[i]
         if i == 0:
-            nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4,
-                                               prev_bajo=bajo_anterior,
-                                               inversion=0)
+            nuevas_alturas = None
+            for inv in range(4):
+                cand = notas_midi_acorde(
+                    fundamental, grados, base_octava=4, prev_bajo=None, inversion=inv
+                )
+                if cand[0] >= 57:
+                    nuevas_alturas = cand
+                    break
+            if nuevas_alturas is None:
+                nuevas_alturas = cand
         else:
-            nuevas_alturas = notas_midi_acorde(fundamental, grados, base_octava=4,
-                                               prev_bajo=bajo_anterior)
+            nuevas_alturas = notas_midi_acorde(
+                fundamental, grados, base_octava=4, prev_bajo=bajo_anterior
+            )
         bajo_anterior = nuevas_alturas[0]
         alturas_previas = [n.pitch for n in notas_corchea]
         nuevas = enlazar_notas(alturas_previas, nuevas_alturas)
         for nota, altura in zip(notas_corchea, nuevas):
             nota.pitch = altura
 
-    pista.notes = [n for n in notas if n.start >= tiempo_inicio and n.start < tiempo_fin]
+    notas_finales = [n for n in notas if tiempo_inicio <= n.start < tiempo_fin]
+
+    if rotacion:
+        grupos = defaultdict(list)
+        for n in notas_finales:
+            grupos[n.start].append(n)
+        if rotacion > 0:
+            for _ in range(rotacion):
+                for g in grupos.values():
+                    bajo = min(g, key=lambda n: n.pitch)
+                    bajo.pitch += 12
+        else:
+            for _ in range(-rotacion):
+                for g in grupos.values():
+                    alto = max(g, key=lambda n: n.pitch)
+                    alto.pitch -= 12
+
+    pista.notes = notas_finales
 
     out_name = os.path.splitext(os.path.basename(reference_midi_path))[0] + "_export.mid"
     midi.write(out_name)
