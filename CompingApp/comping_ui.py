@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, ttk, filedialog, colorchooser
+import tkinter.font as tkfont
 import os
 from procesa_midi import procesa_midi, notas_midi_acorde, notas_naturales
 from cifrado_utils import analizar_cifrado
@@ -23,6 +24,33 @@ class MidiApp(tk.Tk):
         self.title("Comping MIDI Exporter")
         self.geometry("560x360")
         self.configure(bg=BACKGROUND)
+        # Apariencia
+        self.bg_color = BACKGROUND
+        self.fg_color = FOREGROUND
+        self.accent_color = ACCENT
+        self.entry_bg_color = ENTRY_BACKGROUND
+        self.font_family = "Helvetica"
+        self.font_size = 20
+        self.font = (self.font_family, self.font_size)
+
+        # Menú de apariencia
+        self.menu_bar = tk.Menu(self)
+        self.config(menu=self.menu_bar)
+        apariencia_menu = tk.Menu(self.menu_bar, tearoff=0)
+        apariencia_menu.add_command(label="Personalizar", command=self.open_appearance_window)
+        self.menu_bar.add_cascade(label="Apariencia", menu=apariencia_menu)
+
+        self.style = ttk.Style()
+        try:
+            self.style.theme_use("clam")
+        except Exception:
+            pass
+        self.style.configure(
+            "TCombobox",
+            fieldbackground=self.entry_bg_color,
+            background=self.entry_bg_color,
+            foreground=self.fg_color,
+        )
 
         self.cifrado_label = tk.Label(
             self,
@@ -44,18 +72,32 @@ class MidiApp(tk.Tk):
         self.cifrado_entry.pack()
         self.cifrado_entry.bind("<KeyRelease>", lambda e: self.update_chord_list())
 
+        self.reference_midi_path = "reference_comping.mid"
         self.midi_label = tk.Label(
             self,
-            text="Archivo MIDI de referencia: reference_comping.mid",
+            text=f"Archivo MIDI de referencia: {os.path.basename(self.reference_midi_path)}",
             bg=BACKGROUND,
             fg=FOREGROUND,
             font=FONT,
         )
-        self.midi_label.pack(pady=10)
+        self.midi_label.pack(pady=5)
+        self.midi_btn = tk.Button(
+            self,
+            text="Cargar MIDI",
+            command=self.load_midi,
+            bg=ACCENT,
+            fg=FOREGROUND,
+            activebackground=ACCENT,
+            activeforeground=FOREGROUND,
+            font=FONT,
+        )
+        self.midi_btn.pack(pady=5)
 
         self.rotacion = 0
         # Rotaciones individuales por acorde (índice de corchea -> rotación)
         self.rotaciones_forzadas = {}
+        # Desplazamientos de octava por acorde
+        self.octavas_forzadas = {}
         self.chords = []
         # Inversiones base calculadas a partir de la nota más grave de cada acorde
         self.base_inversions = []
@@ -107,9 +149,39 @@ class MidiApp(tk.Tk):
         self.inv_label = tk.Label(self, text="Inversión:", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
         self.inv_label.pack(pady=5)
         self.inv_options = ["Fundamental", "1ª inversión", "2ª inversión", "3ª inversión"]
-        self.inv_combo = ttk.Combobox(self, state="readonly", values=self.inv_options, font=FONT)
+        self.inv_frame = tk.Frame(self, bg=BACKGROUND)
+        self.inv_frame.pack()
+        self.inv_combo = ttk.Combobox(self.inv_frame, state="readonly", values=self.inv_options, font=FONT)
         self.inv_combo.bind("<<ComboboxSelected>>", self.on_inv_selected)
-        self.inv_combo.pack()
+        self.inv_combo.pack(side="left")
+        self.oct_frame = tk.Frame(self.inv_frame, bg=BACKGROUND)
+        self.oct_frame.pack(side="left", padx=5)
+        self.oct_label = tk.Label(self.oct_frame, text="Octavar", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
+        self.oct_label.pack()
+        self.oct_btns = tk.Frame(self.oct_frame, bg=BACKGROUND)
+        self.oct_btns.pack()
+        self.oct_minus = tk.Button(
+            self.oct_btns,
+            text="-",
+            command=self.octavar_menos,
+            bg=ACCENT,
+            fg=FOREGROUND,
+            activebackground=ACCENT,
+            activeforeground=FOREGROUND,
+            font=FONT,
+        )
+        self.oct_minus.pack(side="left")
+        self.oct_plus = tk.Button(
+            self.oct_btns,
+            text="+",
+            command=self.octavar_mas,
+            bg=ACCENT,
+            fg=FOREGROUND,
+            activebackground=ACCENT,
+            activeforeground=FOREGROUND,
+            font=FONT,
+        )
+        self.oct_plus.pack(side="left")
         self.update_chord_list()
 
         self.spread_var = tk.BooleanVar(value=False)
@@ -156,6 +228,8 @@ class MidiApp(tk.Tk):
         )
         self.export_btn.pack(pady=5)
 
+        self.apply_styles()
+
     def _rotar_seleccion(self, delta):
         """Ajusta la rotación global de todos los acordes."""
         nueva = self.rotacion + delta
@@ -167,6 +241,7 @@ class MidiApp(tk.Tk):
     def reset_rotaciones(self):
         self.rotacion = 0
         self.rotaciones_forzadas.clear()
+        self.octavas_forzadas.clear()
         self.rot_label.config(text="Rotar: 0")
         self.update_inversion_display()
 
@@ -210,6 +285,9 @@ class MidiApp(tk.Tk):
         self.rotaciones_forzadas = {
             i: r for i, r in self.rotaciones_forzadas.items() if i < len(chords)
         }
+        self.octavas_forzadas = {
+            i: o for i, o in self.octavas_forzadas.items() if i < len(chords)
+        }
         self.calcular_inversiones()
         display = [f"{i+1}: {c}" for i, c in enumerate(chords)]
         self.chord_combo["values"] = display
@@ -251,6 +329,26 @@ class MidiApp(tk.Tk):
     def rotar_menos(self):
         self._rotar_seleccion(-1)
 
+    def octavar_mas(self):
+        idx = self.chord_combo.current()
+        if idx < 0:
+            return
+        val = self.octavas_forzadas.get(idx, 0) + 1
+        if val:
+            self.octavas_forzadas[idx] = val
+        elif idx in self.octavas_forzadas:
+            del self.octavas_forzadas[idx]
+
+    def octavar_menos(self):
+        idx = self.chord_combo.current()
+        if idx < 0:
+            return
+        val = self.octavas_forzadas.get(idx, 0) - 1
+        if val:
+            self.octavas_forzadas[idx] = val
+        elif idx in self.octavas_forzadas:
+            del self.octavas_forzadas[idx]
+
     def get_midi_ports(self):
         if mido is None:
             return []
@@ -273,8 +371,11 @@ class MidiApp(tk.Tk):
         if not cifrado:
             messagebox.showerror("Error", "Por favor, escribe un cifrado.")
             return
-        if not os.path.exists("reference_comping.mid"):
-            messagebox.showerror("Error", "No se encontró 'reference_comping.mid' en esta carpeta.")
+        if not os.path.exists(self.reference_midi_path):
+            messagebox.showerror(
+                "Error",
+                f"No se encontró '{os.path.basename(self.reference_midi_path)}'",
+            )
             return
         port_name = self.port_combo.get()
         if not port_name:
@@ -282,10 +383,11 @@ class MidiApp(tk.Tk):
             return
         try:
             midi_obj = procesa_midi(
-                "reference_comping.mid",
+                self.reference_midi_path,
                 cifrado,
                 rotacion=self.rotacion,
                 rotaciones=self.rotaciones_forzadas,
+                octavas=self.octavas_forzadas,
                 spread=self.spread_var.get(),
                 save=False,
             )
@@ -306,20 +408,167 @@ class MidiApp(tk.Tk):
         if not cifrado:
             messagebox.showerror("Error", "Por favor, escribe un cifrado.")
             return
-        if not os.path.exists("reference_comping.mid"):
-            messagebox.showerror("Error", "No se encontró 'reference_comping.mid' en esta carpeta.")
+        if not os.path.exists(self.reference_midi_path):
+            messagebox.showerror(
+                "Error",
+                f"No se encontró '{os.path.basename(self.reference_midi_path)}'",
+            )
             return
         try:
             out_path = procesa_midi(
-                "reference_comping.mid",
+                self.reference_midi_path,
                 cifrado,
                 rotacion=self.rotacion,
                 rotaciones=self.rotaciones_forzadas,
+                octavas=self.octavas_forzadas,
                 spread=self.spread_var.get(),
             )
             print(f"Archivo exportado: {out_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
+
+    def load_midi(self):
+        path = filedialog.askopenfilename(filetypes=[("MIDI", "*.mid"), ("Todos", "*")])
+        if path:
+            self.reference_midi_path = path
+            self.midi_label.config(
+                text=f"Archivo MIDI de referencia: {os.path.basename(path)}"
+            )
+
+    def open_appearance_window(self):
+        win = tk.Toplevel(self)
+        win.title("Apariencia")
+        win.configure(bg=self.bg_color)
+
+        font_frame = tk.LabelFrame(
+            win, text="Fuentes", bg=self.bg_color, fg=self.fg_color, font=self.font
+        )
+        font_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        canvas = tk.Canvas(font_frame, bg=self.bg_color, highlightthickness=0)
+        sb = tk.Scrollbar(font_frame, orient="vertical", command=canvas.yview)
+        inner = tk.Frame(canvas, bg=self.bg_color)
+        inner.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=sb.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+
+        for fam in sorted(tkfont.families()):
+            tk.Button(
+                inner,
+                text=fam,
+                font=(fam, self.font_size),
+                bg=self.accent_color,
+                fg=self.fg_color,
+                activebackground=self.accent_color,
+                activeforeground=self.fg_color,
+                command=lambda f=fam: self.set_font_family(f),
+            ).pack(fill="x")
+
+        size_frame = tk.Frame(font_frame, bg=self.bg_color)
+        size_frame.pack(pady=5)
+        tk.Label(
+            size_frame, text="Tamaño:", bg=self.bg_color, fg=self.fg_color, font=self.font
+        ).pack(side="left")
+        size_spin = tk.Spinbox(
+            size_frame,
+            from_=8,
+            to=72,
+            width=5,
+            font=self.font,
+            command=lambda: self.set_font_size(int(size_spin.get())),
+        )
+        size_spin.delete(0, "end")
+        size_spin.insert(0, self.font_size)
+        size_spin.pack(side="left", padx=5)
+
+        color_frame = tk.LabelFrame(
+            win, text="Colores", bg=self.bg_color, fg=self.fg_color, font=self.font
+        )
+        color_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self._add_color_selector(color_frame, "Fondo", "bg_color")
+        self._add_color_selector(color_frame, "Texto", "fg_color")
+        self._add_color_selector(color_frame, "Botones", "accent_color")
+        self._add_color_selector(color_frame, "Entrada", "entry_bg_color")
+
+    def _add_color_selector(self, parent, label, attr):
+        frame = tk.Frame(parent, bg=self.bg_color)
+        frame.pack(pady=5, fill="x")
+        tk.Label(frame, text=label, bg=self.bg_color, fg=self.fg_color, font=self.font).pack(
+            side="left"
+        )
+        preview = tk.Label(frame, bg=getattr(self, attr), width=3, height=1)
+        preview.pack(side="left", padx=5)
+        preview.bind(
+            "<Button-1>",
+            lambda e, a=attr, p=preview: self.choose_color(a, p),
+        )
+
+    def choose_color(self, attr, widget):
+        color = colorchooser.askcolor(getattr(self, attr))[1]
+        if color:
+            setattr(self, attr, color)
+            widget.config(bg=color)
+            self.apply_styles()
+
+    def set_font_family(self, family):
+        self.font_family = family
+        self.font = (self.font_family, self.font_size)
+        self.apply_styles()
+
+    def set_font_size(self, size):
+        self.font_size = size
+        self.font = (self.font_family, self.font_size)
+        self.apply_styles()
+
+    def apply_styles(self):
+        self.configure(bg=self.bg_color)
+        self.style.configure(
+            "TCombobox",
+            fieldbackground=self.entry_bg_color,
+            background=self.entry_bg_color,
+            foreground=self.fg_color,
+        )
+        for child in self.winfo_children():
+            self._style_widget(child)
+
+    def _style_widget(self, widget):
+        if isinstance(widget, tk.Label):
+            widget.configure(bg=self.bg_color, fg=self.fg_color, font=self.font)
+        elif isinstance(widget, tk.Button):
+            widget.configure(
+                bg=self.accent_color,
+                fg=self.fg_color,
+                activebackground=self.accent_color,
+                activeforeground=self.fg_color,
+                font=self.font,
+            )
+        elif isinstance(widget, tk.Text):
+            widget.configure(
+                bg=self.entry_bg_color,
+                fg=self.fg_color,
+                insertbackground=self.fg_color,
+                font=self.font,
+            )
+        elif isinstance(widget, tk.Frame):
+            widget.configure(bg=self.bg_color)
+        elif isinstance(widget, tk.Checkbutton):
+            widget.configure(
+                bg=self.accent_color,
+                fg=self.fg_color,
+                selectcolor=self.accent_color,
+                activebackground=self.accent_color,
+                activeforeground=self.fg_color,
+                font=self.font,
+            )
+        elif isinstance(widget, ttk.Combobox):
+            widget.configure(font=self.font)
+        for child in widget.winfo_children():
+            self._style_widget(child)
 
 if __name__ == "__main__":
     app = MidiApp()
