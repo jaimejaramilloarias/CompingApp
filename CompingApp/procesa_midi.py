@@ -254,7 +254,12 @@ def aplicar_rotaciones(notas, rotacion=0, rotaciones=None):
 
 
 def Spread(notas):
-    """Duplica la segunda nota de cada acorde una y dos octavas arriba."""
+    """Duplica notas del acorde para crear un voicing abierto.
+
+    Se duplica la segunda nota del acorde una y dos octavas arriba y se
+    agrega una de las notas del acorde una octava arriba, ubicada entre las
+    dos notas duplicadas anteriores.
+    """
 
     grupos = defaultdict(list)
     for n in notas:
@@ -264,14 +269,23 @@ def Spread(notas):
     for grupo in grupos.values():
         if len(grupo) < 2:
             continue
-        segunda = sorted(grupo, key=lambda n: n.pitch)[1]
+        ordenado = sorted(grupo, key=lambda n: n.pitch)
+        segunda = ordenado[1]
+        # Selecciona la nota más aguda del acorde para el agregado intermedio.
+        extra = ordenado[-1]
+
         cls = segunda.__class__
-        for desplazamiento in (12, 24):
+        duplicados = (
+            (segunda, 12),
+            (extra, 12),
+            (segunda, 24),
+        )
+        for nota, desplazamiento in duplicados:
             nueva = cls(
-                velocity=getattr(segunda, "velocity", 0),
-                pitch=segunda.pitch + desplazamiento,
-                start=segunda.start,
-                end=segunda.end,
+                velocity=getattr(nota, "velocity", 0),
+                pitch=nota.pitch + desplazamiento,
+                start=nota.start,
+                end=nota.end,
             )
             nuevas.append(nueva)
     notas.extend(nuevas)
