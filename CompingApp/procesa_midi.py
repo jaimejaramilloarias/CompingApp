@@ -15,9 +15,25 @@ notas_naturales = {
     'B': 11
 }
 
-def expandir_cifrado_a_corcheas(cifrado_texto, total_corcheas=256, corcheas_por_compas=8):
+def expandir_cifrado_a_corcheas(
+    cifrado_texto,
+    total_corcheas=256,
+    corcheas_por_compas=8,
+    return_indices=False,
+):
+    """Expande un cifrado para obtener el acorde de cada corchea.
+
+    Cuando ``return_indices`` es ``True`` también se devuelve una lista con el
+    índice del acorde correspondiente a cada corchea.  Este índice coincide con
+    el orden en que aparecen los acordes al recorrer el cifrado de izquierda a
+    derecha, independientemente de si dos acordes consecutivos comparten el
+    mismo nombre.
+    """
+
     compases = [c.strip() for c in cifrado_texto.split('|') if c.strip()]
     resultado = []
+    indices = []
+    acorde_idx = 0
     for compas in compases:
         acordes_compas = [a.strip() for a in compas.split() if a.strip()]
         n_acordes = len(acordes_compas)
@@ -27,11 +43,21 @@ def expandir_cifrado_a_corcheas(cifrado_texto, total_corcheas=256, corcheas_por_
         resto = corcheas_por_compas - corcheas_por_acorde * n_acordes
         for i, acorde in enumerate(acordes_compas):
             extra = 1 if i < resto else 0
-            resultado += [acorde] * (corcheas_por_acorde + extra)
+            repeticiones = corcheas_por_acorde + extra
+            resultado += [acorde] * repeticiones
+            if return_indices:
+                indices += [acorde_idx] * repeticiones
+            acorde_idx += 1
     if len(resultado) < total_corcheas:
         resultado += [resultado[-1]] * (total_corcheas - len(resultado))
+        if return_indices:
+            indices += [indices[-1]] * (total_corcheas - len(indices))
     if len(resultado) > total_corcheas:
         resultado = resultado[:total_corcheas]
+        if return_indices:
+            indices = indices[:total_corcheas]
+    if return_indices:
+        return resultado, indices
     return resultado
 
 def notas_midi_acorde(fundamental, grados, base_octava=4, prev_bajo=None, inversion=0):
@@ -222,33 +248,70 @@ def recortar_notas_a_segmento(notas, inicio, fin):
     return notas
 
 
-def aplicar_rotaciones(notas, rotacion=0, rotaciones=None):
+def aplicar_rotaciones(
+    notas,
+    rotacion=0,
+    rotaciones=None,
+    indices=None,
+    dur_corchea=0.25,
+    tiempo_inicio=0,
+):
     """Aplica rotaciones de inversión a listas de notas.
 
     ``rotacion`` es la rotación global que se aplica a todos los acordes.
     ``rotaciones`` es un diccionario opcional cuyo índice corresponde al orden
     del acorde (empezando en ``0``) y cuyo valor indica rotaciones adicionales
-    para ese acorde.  Rotaciones positivas desplazan la nota más grave una
-    octava arriba; rotaciones negativas bajan la nota más aguda.
+    para ese acorde.  Si ``indices`` es proporcionado, debe ser una lista cuyo
+    elemento ``i`` indica el índice del acorde activo en la corchea ``i``; en
+    ese caso, las rotaciones forzadas se aplicarán a todas las notas que caigan
+    dentro de la duración del acorde correspondiente.  ``tiempo_inicio``
+    representa el instante de inicio de la primera corchea (en segundos).  Cuando
+    ``indices`` es ``None`` se mantiene el comportamiento anterior, interpretando
+    que cada grupo de notas representa un nuevo acorde consecutivo.
     """
+
     grupos = defaultdict(list)
     for n in notas:
         grupos[n.start].append(n)
 
-    for idx, start in enumerate(sorted(grupos)):
-        rot = rotacion
-        if rotaciones and idx in rotaciones:
-            rot += rotaciones[idx]
+    if not grupos:
+        return notas
 
-        g = grupos[start]
-        if rot > 0:
-            for _ in range(rot):
-                bajo = min(g, key=lambda n: n.pitch)
-                bajo.pitch += 12
-        elif rot < 0:
-            for _ in range(-rot):
-                alto = max(g, key=lambda n: n.pitch)
-                alto.pitch -= 12
+    if indices is None:
+        for idx, start in enumerate(sorted(grupos)):
+            rot = rotacion
+            if rotaciones and idx in rotaciones:
+                rot += rotaciones[idx]
+
+            g = grupos[start]
+            if rot > 0:
+                for _ in range(rot):
+                    bajo = min(g, key=lambda n: n.pitch)
+                    bajo.pitch += 12
+            elif rot < 0:
+                for _ in range(-rot):
+                    alto = max(g, key=lambda n: n.pitch)
+                    alto.pitch -= 12
+    else:
+        for start in sorted(grupos):
+            corchea_idx = int(round((start - tiempo_inicio) / dur_corchea))
+            rot = rotacion
+            if (
+                rotaciones
+                and 0 <= corchea_idx < len(indices)
+            ):
+                acorde_idx = indices[corchea_idx]
+                rot += rotaciones.get(acorde_idx, 0)
+
+            g = grupos[start]
+            if rot > 0:
+                for _ in range(rot):
+                    bajo = min(g, key=lambda n: n.pitch)
+                    bajo.pitch += 12
+            elif rot < 0:
+                for _ in range(-rot):
+                    alto = max(g, key=lambda n: n.pitch)
+                    alto.pitch -= 12
 
     return notas
 
@@ -321,7 +384,9 @@ def procesa_midi(
     tiempo_inicio = min(n.start for n in notas)
     tiempo_fin = tiempo_inicio + total_corcheas * dur_corchea
 
-    acordes_corchea = expandir_cifrado_a_corcheas(cifrado, total_corcheas, corcheas_por_compas)
+    acordes_corchea, indices_acordes = expandir_cifrado_a_corcheas(
+        cifrado, total_corcheas, corcheas_por_compas, return_indices=True
+    )
     cache = {}
     acordes_analizados = []
     for a in acordes_corchea:
@@ -381,7 +446,14 @@ def procesa_midi(
     notas_finales = [n for n in notas if tiempo_inicio <= n.start < tiempo_fin]
     evitar_solapamientos(notas_finales)
 
-    aplicar_rotaciones(notas_finales, rotacion, rotaciones)
+    aplicar_rotaciones(
+        notas_finales,
+        rotacion,
+        rotaciones,
+        indices_acordes,
+        dur_corchea,
+        tiempo_inicio,
+    )
     if spread:
         Spread(notas_finales)
 
