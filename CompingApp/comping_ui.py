@@ -6,12 +6,14 @@ from procesa_midi import procesa_midi, notas_midi_acorde, notas_naturales
 from cifrado_utils import analizar_cifrado
 
 # Colores y fuente para un aspecto moderno
-BACKGROUND = "#202124"  # fondo general muy oscuro
-PANEL_BG = "#27282c"  # paneles y frames
+BACKGROUND = "#000000"  # fondo general negro puro
+PANEL_BG = "#2e2e2e"  # paneles y frames en gris oscuro
 FOREGROUND = "#fafafa"  # texto principal
 SECONDARY_FOREGROUND = "#bdbdbd"  # texto secundario
 ACCENT = "#ff9800"  # color de acento
 ENTRY_BACKGROUND = "#23252b"  # entradas de texto
+COMBOBOX_BG = "#ffffff"  # color de fondo de los comboboxes
+COMBOBOX_FG = "#000000"  # texto de los comboboxes en negro
 FONT = ("Monaco", 18)
 
 try:
@@ -33,11 +35,14 @@ class MidiApp(tk.Tk):
         self.secondary_fg_color = SECONDARY_FOREGROUND
         self.accent_color = ACCENT
         self.entry_bg_color = ENTRY_BACKGROUND
+        self.combobox_bg_color = COMBOBOX_BG
+        self.combobox_fg_color = COMBOBOX_FG
         self.font_family = FONT[0]
         self.font_size = FONT[1]
         self.font = (self.font_family, self.font_size)
         self.header_font = (self.font_family, 36)
         self.secondary_labels = set()
+        self.window_order = list(range(32))
 
         # Menú de apariencia
         self.menu_bar = tk.Menu(self)
@@ -53,10 +58,10 @@ class MidiApp(tk.Tk):
             pass
         self.style.configure(
             "TCombobox",
-            fieldbackground=self.entry_bg_color,
-            background=self.entry_bg_color,
-            foreground=self.fg_color,
-            arrowcolor=self.fg_color,
+            fieldbackground=self.combobox_bg_color,
+            background=self.combobox_bg_color,
+            foreground=self.combobox_fg_color,
+            arrowcolor=self.combobox_fg_color,
         )
 
         # Cabecera
@@ -196,6 +201,20 @@ class MidiApp(tk.Tk):
             font=self.font,
         )
         self.spread_btn.pack(pady=5)
+
+        self.variation_btn = tk.Button(
+            self.left_panel,
+            text="Generar variación",
+            command=self.generar_variacion,
+            bg=self.accent_color,
+            fg=self.bg_color,
+            activebackground=self.accent_color,
+            activeforeground=self.bg_color,
+            font=(self.font_family, self.font_size, "bold"),
+            relief="flat",
+            bd=0,
+        )
+        self.variation_btn.pack(pady=5, fill="x", padx=10)
 
         # ---- Panel derecho ----
         self.chord_label = tk.Label(
@@ -447,6 +466,12 @@ class MidiApp(tk.Tk):
         if ports:
             self.port_combo.current(0)
 
+    def generar_variacion(self):
+        import random
+        ventanas = list(range(32))
+        random.shuffle(ventanas)
+        self.window_order = ventanas
+
     def preview_midi(self):
         if mido is None:
             messagebox.showerror("Error", "La librería mido no está instalada.")
@@ -473,6 +498,7 @@ class MidiApp(tk.Tk):
                 rotaciones=self.rotaciones_forzadas,
                 octavas=self.octavas_forzadas,
                 spread=self.spread_var.get(),
+                window_order=self.window_order,
                 save=False,
             )
             import io
@@ -506,6 +532,7 @@ class MidiApp(tk.Tk):
                 rotaciones=self.rotaciones_forzadas,
                 octavas=self.octavas_forzadas,
                 spread=self.spread_var.get(),
+                window_order=self.window_order,
             )
             print(f"Archivo exportado: {out_path}")
         except Exception as e:
@@ -529,29 +556,15 @@ class MidiApp(tk.Tk):
         )
         font_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        canvas = tk.Canvas(font_frame, bg=self.bg_color, highlightthickness=0)
-        sb = tk.Scrollbar(font_frame, orient="vertical", command=canvas.yview)
-        inner = tk.Frame(canvas, bg=self.bg_color)
-        inner.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        font_combo = ttk.Combobox(
+            font_frame,
+            state="readonly",
+            values=sorted(tkfont.families()),
+            font=self.font,
         )
-        canvas.create_window((0, 0), window=inner, anchor="nw")
-        canvas.configure(yscrollcommand=sb.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        sb.pack(side="right", fill="y")
-
-        for fam in sorted(tkfont.families()):
-            tk.Button(
-                inner,
-                text=fam,
-                font=(fam, self.font_size),
-                bg=self.accent_color,
-                fg=self.fg_color,
-                activebackground=self.accent_color,
-                activeforeground=self.fg_color,
-                command=lambda f=fam: self.set_font_family(f),
-            ).pack(fill="x")
+        font_combo.set(self.font_family)
+        font_combo.bind("<<ComboboxSelected>>", lambda e: self.set_font_family(font_combo.get()))
+        font_combo.pack(fill="x", padx=10, pady=5)
 
         size_frame = tk.Frame(font_frame, bg=self.bg_color)
         size_frame.pack(pady=5)
@@ -580,6 +593,8 @@ class MidiApp(tk.Tk):
         self._add_color_selector(color_frame, "Texto secundario", "secondary_fg_color")
         self._add_color_selector(color_frame, "Botones", "accent_color")
         self._add_color_selector(color_frame, "Entrada", "entry_bg_color")
+        self._add_color_selector(color_frame, "Combobox", "combobox_bg_color")
+        self._add_color_selector(color_frame, "Texto combobox", "combobox_fg_color")
 
     def _add_color_selector(self, parent, label, attr):
         frame = tk.Frame(parent, bg=self.bg_color)
@@ -620,10 +635,10 @@ class MidiApp(tk.Tk):
         )
         self.style.configure(
             "TCombobox",
-            fieldbackground=self.entry_bg_color,
-            background=self.entry_bg_color,
-            foreground=self.fg_color,
-            arrowcolor=self.fg_color,
+            fieldbackground=self.combobox_bg_color,
+            background=self.combobox_bg_color,
+            foreground=self.combobox_fg_color,
+            arrowcolor=self.combobox_fg_color,
         )
         for panel in (self.left_panel, self.right_panel):
             panel.configure(bg=self.panel_bg_color)
@@ -665,7 +680,7 @@ class MidiApp(tk.Tk):
                 font=self.font,
             )
         elif isinstance(widget, ttk.Combobox):
-            widget.configure(font=self.font)
+            widget.configure(font=self.font, foreground=self.combobox_fg_color)
         for child in widget.winfo_children():
             self._style_widget(child)
 

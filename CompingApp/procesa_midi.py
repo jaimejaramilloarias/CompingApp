@@ -248,6 +248,48 @@ def recortar_notas_a_segmento(notas, inicio, fin):
     return notas
 
 
+def reordenar_ventanas(notas, dur_corchea=0.25, ventana_corcheas=8, orden=None):
+    """Reordena "ventanas" de ``ventana_corcheas`` corcheas en ``notas``."""
+    if not orden:
+        return list(notas)
+    import pretty_midi
+
+    inicio = min(n.start for n in notas)
+    fin = max(n.end for n in notas)
+    dur_ventana = ventana_corcheas * dur_corchea
+    num_ventanas = int((fin - inicio) // dur_ventana)
+    ventanas = []
+    for i in range(num_ventanas):
+        v_ini = inicio + i * dur_ventana
+        v_fin = v_ini + dur_ventana
+        grupo = []
+        for n in notas:
+            if n.end <= v_ini or n.start >= v_fin:
+                continue
+            start = max(n.start, v_ini) - v_ini
+            end = min(n.end, v_fin) - v_ini
+            grupo.append(
+                pretty_midi.Note(velocity=n.velocity, pitch=n.pitch, start=start, end=end)
+            )
+        ventanas.append(grupo)
+    nuevas = []
+    cursor = inicio
+    for idx in orden:
+        if idx >= len(ventanas):
+            continue
+        for n in ventanas[idx]:
+            nuevas.append(
+                pretty_midi.Note(
+                    velocity=n.velocity,
+                    pitch=n.pitch,
+                    start=cursor + n.start,
+                    end=cursor + n.end,
+                )
+            )
+        cursor += dur_ventana
+    return nuevas
+
+
 def aplicar_rotaciones(
     notas,
     rotacion=0,
@@ -374,6 +416,7 @@ def procesa_midi(
     rotaciones=None,
     octavas=None,
     spread=False,
+    window_order=None,
     save=True,
 ):
     """Genera un archivo MIDI con el cifrado indicado.
@@ -389,7 +432,8 @@ def procesa_midi(
 
     midi = pretty_midi.PrettyMIDI(reference_midi_path)
     pista = midi.instruments[0]
-    notas = pista.notes
+    notas = reordenar_ventanas(pista.notes, dur_corchea, 8, window_order)
+    pista.notes = notas
 
     compases = [c.strip() for c in cifrado.split('|') if c.strip()]
     total_corcheas = len(compases) * corcheas_por_compas
