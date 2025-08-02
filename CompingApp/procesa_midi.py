@@ -203,9 +203,25 @@ def evitar_solapamientos(notas, margen=0.01):
                 nuevo_fin = actual.start
             actual.end = nuevo_fin
 
-def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corcheas_por_compas=8, dur_corchea=0.25, rotacion=0):
+def procesa_midi(
+    reference_midi_path="reference_comping.mid",
+    cifrado="",
+    corcheas_por_compas=8,
+    dur_corchea=0.25,
+    rotacion=0,
+    save=True,
+):
+    """Genera un archivo MIDI con el cifrado indicado.
+
+    Si ``save`` es ``True`` (valor por defecto) el resultado se escribe en un
+    archivo dentro de ``~/Desktop/output`` y se devuelve la ruta al mismo.  Si
+    ``save`` es ``False`` se devuelve el objeto ``PrettyMIDI`` resultante sin
+    persistirlo en disco, lo cual permite previsualizar el MIDI antes de
+    exportarlo definitivamente.
+    """
     import pretty_midi
     from collections import defaultdict
+
     midi = pretty_midi.PrettyMIDI(reference_midi_path)
     pista = midi.instruments[0]
     notas = pista.notes
@@ -289,14 +305,17 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
 
     pista.notes = notas_finales
 
-    out_dir = Path.home() / "Desktop" / "output"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    indices = [int(p.stem) for p in out_dir.glob("*.mid") if p.stem.isdigit()]
-    next_idx = max(indices, default=0) + 1
-    out_path = out_dir / f"{next_idx}.mid"
-    midi.write(str(out_path))
-    print(f"Archivo exportado: {out_path}")
-    archivos = sorted(out_dir.glob("*.mid"), key=lambda p: int(p.stem))
-    for p in archivos:
-        print(p.name)
-    return str(out_path)
+    if save:
+        out_dir = Path.home() / "Desktop" / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        indices = [int(p.stem) for p in out_dir.glob("*.mid") if p.stem.isdigit()]
+        next_idx = max(indices, default=0) + 1
+        out_path = out_dir / f"{next_idx}.mid"
+        midi.write(str(out_path))
+        print(f"Archivo exportado: {out_path}")
+        archivos = sorted(out_dir.glob("*.mid"), key=lambda p: int(p.stem))
+        for p in archivos:
+            print(p.name)
+        return str(out_path)
+    else:
+        return midi
