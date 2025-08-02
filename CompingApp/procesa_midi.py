@@ -252,6 +252,7 @@ def aplicar_rotaciones(
     notas,
     rotacion=0,
     rotaciones=None,
+    octavas=None,
     indices=None,
     dur_corchea=0.25,
     tiempo_inicio=0,
@@ -282,8 +283,12 @@ def aplicar_rotaciones(
             rot = rotacion
             if rotaciones and idx in rotaciones:
                 rot += rotaciones[idx]
+            oct = octavas.get(idx, 0) if octavas else 0
 
             g = grupos[start]
+            if oct:
+                for n in g:
+                    n.pitch += 12 * oct
             if rot > 0:
                 for _ in range(rot):
                     bajo = min(g, key=lambda n: n.pitch)
@@ -296,14 +301,20 @@ def aplicar_rotaciones(
         for start in sorted(grupos):
             corchea_idx = int(round((start - tiempo_inicio) / dur_corchea))
             rot = rotacion
+            oct = 0
             if (
                 rotaciones
                 and 0 <= corchea_idx < len(indices)
             ):
                 acorde_idx = indices[corchea_idx]
                 rot += rotaciones.get(acorde_idx, 0)
+                if octavas:
+                    oct = octavas.get(acorde_idx, 0)
 
             g = grupos[start]
+            if oct:
+                for n in g:
+                    n.pitch += 12 * oct
             if rot > 0:
                 for _ in range(rot):
                     bajo = min(g, key=lambda n: n.pitch)
@@ -361,6 +372,7 @@ def procesa_midi(
     dur_corchea=0.25,
     rotacion=0,
     rotaciones=None,
+    octavas=None,
     spread=False,
     save=True,
 ):
@@ -450,6 +462,7 @@ def procesa_midi(
         notas_finales,
         rotacion,
         rotaciones,
+        octavas,
         indices_acordes,
         dur_corchea,
         tiempo_inicio,
