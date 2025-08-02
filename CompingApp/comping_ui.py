@@ -6,9 +6,10 @@ from procesa_midi import procesa_midi
 # Colores y fuente para un aspecto moderno
 BACKGROUND = "#2b2b2b"
 FOREGROUND = "#f5f5f5"
-ACCENT = "#4e9af1"
+# Color oscuro para botones y entradas
+ACCENT = "#3c3f41"
 ENTRY_BACKGROUND = "#3c3f41"
-FONT = ("Helvetica", 10)
+FONT = ("Helvetica", 20)
 
 try:
     import mido
@@ -63,7 +64,7 @@ class MidiApp(tk.Tk):
             command=self.rotar_menos,
             bg=ACCENT,
             fg=FOREGROUND,
-            activebackground="#3a7bd5",
+            activebackground=ACCENT,
             activeforeground=FOREGROUND,
             font=FONT,
         )
@@ -74,7 +75,7 @@ class MidiApp(tk.Tk):
             command=self.rotar_mas,
             bg=ACCENT,
             fg=FOREGROUND,
-            activebackground="#3a7bd5",
+            activebackground=ACCENT,
             activeforeground=FOREGROUND,
             font=FONT,
         )
@@ -86,7 +87,7 @@ class MidiApp(tk.Tk):
             command=self.reset_rotaciones,
             bg=ACCENT,
             fg=FOREGROUND,
-            activebackground="#3a7bd5",
+            activebackground=ACCENT,
             activeforeground=FOREGROUND,
             font=FONT,
         )
@@ -97,10 +98,10 @@ class MidiApp(tk.Tk):
             self,
             text="Spread",
             variable=self.spread_var,
-            bg=BACKGROUND,
+            bg=ACCENT,
             fg=FOREGROUND,
-            selectcolor=BACKGROUND,
-            activebackground=BACKGROUND,
+            selectcolor=ACCENT,
+            activebackground=ACCENT,
             activeforeground=FOREGROUND,
             font=FONT,
         )
@@ -118,7 +119,7 @@ class MidiApp(tk.Tk):
             command=self.preview_midi,
             bg=ACCENT,
             fg=FOREGROUND,
-            activebackground="#3a7bd5",
+            activebackground=ACCENT,
             activeforeground=FOREGROUND,
             font=FONT,
         )
@@ -130,7 +131,7 @@ class MidiApp(tk.Tk):
             command=self.export_midi,
             bg=ACCENT,
             fg=FOREGROUND,
-            activebackground="#3a7bd5",
+            activebackground=ACCENT,
             activeforeground=FOREGROUND,
             font=FONT,
         )
