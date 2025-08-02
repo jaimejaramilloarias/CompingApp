@@ -271,6 +271,17 @@ def reordenar_ventanas(notas, dur_corchea=0.25, ventana_corcheas=8, orden=None):
             grupo.append(
                 pretty_midi.Note(velocity=n.velocity, pitch=n.pitch, start=start, end=end)
             )
+        # Si la primera o última corchea están vacías, añadir notas "dummy"
+        first_end = dur_corchea
+        last_start = dur_ventana - dur_corchea
+        if not any(n.start < first_end and n.end > 0 for n in grupo):
+            grupo.append(
+                pretty_midi.Note(velocity=1, pitch=0, start=0, end=first_end)
+            )
+        if not any(n.start < dur_ventana and n.end > last_start for n in grupo):
+            grupo.append(
+                pretty_midi.Note(velocity=1, pitch=0, start=last_start, end=dur_ventana)
+            )
         ventanas.append(grupo)
     nuevas = []
     cursor = inicio
@@ -455,7 +466,9 @@ def procesa_midi(
         t0 = tiempo_inicio + i * dur_corchea
         t1 = t0 + dur_corchea
         # Nuevo filtrado para incluir notas activas en el segmento (no solo las que inician)
-        notas_corchea = [n for n in notas if not (n.end <= t0 or n.start >= t1)]
+        notas_corchea = [
+            n for n in notas if not (n.end <= t0 or n.start >= t1) and n.velocity > 1
+        ]
 
         # Mantener silencios del midi de referencia
         if not notas_corchea:

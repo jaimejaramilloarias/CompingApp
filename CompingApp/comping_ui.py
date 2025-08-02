@@ -4,6 +4,7 @@ import tkinter.font as tkfont
 import os
 from procesa_midi import procesa_midi, notas_midi_acorde, notas_naturales
 from cifrado_utils import analizar_cifrado
+import threading
 
 # Colores y fuente para un aspecto moderno
 BACKGROUND = "#000000"  # fondo general negro puro
@@ -43,6 +44,8 @@ class MidiApp(tk.Tk):
         self.header_font = (self.font_family, 36)
         self.secondary_labels = set()
         self.window_order = list(range(32))
+        self.preview_thread = None
+        self.stop_preview = None
 
         # Menú de apariencia
         self.menu_bar = tk.Menu(self)
@@ -473,6 +476,11 @@ class MidiApp(tk.Tk):
         self.window_order = ventanas
 
     def preview_midi(self):
+        if self.preview_thread and self.preview_thread.is_alive():
+            if self.stop_preview:
+                self.stop_preview.set()
+            self.preview_btn.config(text="Previsualizar")
+            return
         if mido is None:
             messagebox.showerror("Error", "La librería mido no está instalada.")
             return
@@ -490,28 +498,41 @@ class MidiApp(tk.Tk):
         if not port_name:
             messagebox.showerror("Error", "Selecciona un puerto MIDI.")
             return
-        try:
-            midi_obj = procesa_midi(
-                self.reference_midi_path,
-                cifrado,
-                rotacion=self.rotacion,
-                rotaciones=self.rotaciones_forzadas,
-                octavas=self.octavas_forzadas,
-                spread=self.spread_var.get(),
-                window_order=self.window_order,
-                save=False,
-            )
-            import io
 
-            midi_bytes = io.BytesIO()
-            midi_obj.write(midi_bytes)
-            midi_bytes.seek(0)
-            mid = mido.MidiFile(file=midi_bytes)
-            with mido.open_output(port_name) as port:
-                for msg in mid.play():
-                    port.send(msg)
-        except Exception as e:
-            messagebox.showerror("Error", f"Ocurrió un error al previsualizar:\n{e}")
+        def run_preview():
+            try:
+                midi_obj = procesa_midi(
+                    self.reference_midi_path,
+                    cifrado,
+                    rotacion=self.rotacion,
+                    rotaciones=self.rotaciones_forzadas,
+                    octavas=self.octavas_forzadas,
+                    spread=self.spread_var.get(),
+                    window_order=self.window_order,
+                    save=False,
+                )
+                import io
+
+                midi_bytes = io.BytesIO()
+                midi_obj.write(midi_bytes)
+                midi_bytes.seek(0)
+                mid = mido.MidiFile(file=midi_bytes)
+                with mido.open_output(port_name) as port:
+                    for msg in mid.play():
+                        if self.stop_preview.is_set():
+                            break
+                        port.send(msg)
+            except Exception as e:
+                messagebox.showerror("Error", f"Ocurrió un error al previsualizar:\n{e}")
+            finally:
+                self.preview_btn.config(text="Previsualizar")
+                self.preview_thread = None
+                self.stop_preview = None
+
+        self.stop_preview = threading.Event()
+        self.preview_btn.config(text="Detener")
+        self.preview_thread = threading.Thread(target=run_preview, daemon=True)
+        self.preview_thread.start()
 
     def export_midi(self):
         cifrado = self.cifrado_entry.get("1.0", tk.END).strip()
