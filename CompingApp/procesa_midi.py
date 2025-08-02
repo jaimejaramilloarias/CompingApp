@@ -1,6 +1,7 @@
 import os
 import itertools
 from pathlib import Path
+from collections import defaultdict
 from acordes_dict import acordes
 from cifrado_utils import analizar_cifrado
 
@@ -203,12 +204,44 @@ def evitar_solapamientos(notas, margen=0.01):
                 nuevo_fin = actual.start
             actual.end = nuevo_fin
 
+
+def aplicar_rotaciones(notas, rotacion=0, rotaciones=None):
+    """Aplica rotaciones de inversión a listas de notas.
+
+    ``rotacion`` es la rotación global que se aplica a todos los acordes.
+    ``rotaciones`` es un diccionario opcional cuyo índice corresponde al orden
+    del acorde (empezando en ``0``) y cuyo valor indica rotaciones adicionales
+    para ese acorde.  Rotaciones positivas desplazan la nota más grave una
+    octava arriba; rotaciones negativas bajan la nota más aguda.
+    """
+    grupos = defaultdict(list)
+    for n in notas:
+        grupos[n.start].append(n)
+
+    for idx, start in enumerate(sorted(grupos)):
+        rot = rotacion
+        if rotaciones and idx in rotaciones:
+            rot += rotaciones[idx]
+
+        g = grupos[start]
+        if rot > 0:
+            for _ in range(rot):
+                bajo = min(g, key=lambda n: n.pitch)
+                bajo.pitch += 12
+        elif rot < 0:
+            for _ in range(-rot):
+                alto = max(g, key=lambda n: n.pitch)
+                alto.pitch -= 12
+
+    return notas
+
 def procesa_midi(
     reference_midi_path="reference_comping.mid",
     cifrado="",
     corcheas_por_compas=8,
     dur_corchea=0.25,
     rotacion=0,
+    rotaciones=None,
     save=True,
 ):
     """Genera un archivo MIDI con el cifrado indicado.
@@ -220,7 +253,6 @@ def procesa_midi(
     exportarlo definitivamente.
     """
     import pretty_midi
-    from collections import defaultdict
 
     midi = pretty_midi.PrettyMIDI(reference_midi_path)
     pista = midi.instruments[0]
@@ -288,20 +320,7 @@ def procesa_midi(
     notas_finales = [n for n in notas if tiempo_inicio <= n.start < tiempo_fin]
     evitar_solapamientos(notas_finales)
 
-    if rotacion:
-        grupos = defaultdict(list)
-        for n in notas_finales:
-            grupos[n.start].append(n)
-        if rotacion > 0:
-            for _ in range(rotacion):
-                for g in grupos.values():
-                    bajo = min(g, key=lambda n: n.pitch)
-                    bajo.pitch += 12
-        else:
-            for _ in range(-rotacion):
-                for g in grupos.values():
-                    alto = max(g, key=lambda n: n.pitch)
-                    alto.pitch -= 12
+    aplicar_rotaciones(notas_finales, rotacion, rotaciones)
 
     pista.notes = notas_finales
 

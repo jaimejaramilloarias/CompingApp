@@ -23,6 +23,8 @@ class MidiApp(tk.Tk):
         self.midi_label.pack(pady=10)
 
         self.rotacion = 0
+        # Rotaciones individuales por acorde (índice de corchea -> rotación)
+        self.rotaciones_forzadas = {}
         self.rot_label = tk.Label(self, text="Rotar: 0")
         self.rot_label.pack()
         self.rot_frame = tk.Frame(self)
@@ -44,15 +46,42 @@ class MidiApp(tk.Tk):
         self.export_btn = tk.Button(self, text="Exportar MIDI", command=self.export_midi)
         self.export_btn.pack(pady=5)
 
+    def _rotar_seleccion(self, delta):
+        """Rota los acordes seleccionados en ``cifrado_entry``.
+
+        Si no hay selección, se ajusta la rotación global.
+        ``delta`` debe ser ``+1`` o ``-1``.
+        """
+        try:
+            sel_start = self.cifrado_entry.index("sel.first")
+            sel_end = self.cifrado_entry.index("sel.last")
+        except tk.TclError:
+            sel_start = sel_end = None
+
+        if sel_start and sel_end:
+            antes = self.cifrado_entry.get("1.0", sel_start)
+            seleccion = self.cifrado_entry.get(sel_start, sel_end)
+            n_antes = len([c for c in antes.replace("|", " ").split() if c])
+            chords_sel = [c for c in seleccion.replace("|", " ").split() if c]
+            for i in range(len(chords_sel)):
+                idx = n_antes + i
+                actual = self.rotaciones_forzadas.get(idx, 0) + delta
+                if -3 <= actual <= 3:
+                    if actual:
+                        self.rotaciones_forzadas[idx] = actual
+                    elif idx in self.rotaciones_forzadas:
+                        del self.rotaciones_forzadas[idx]
+        else:
+            nueva = self.rotacion + delta
+            if -3 <= nueva <= 3:
+                self.rotacion = nueva
+                self.rot_label.config(text=f"Rotar: {self.rotacion:+d}")
+
     def rotar_mas(self):
-        if self.rotacion < 3:
-            self.rotacion += 1
-            self.rot_label.config(text=f"Rotar: {self.rotacion:+d}")
+        self._rotar_seleccion(1)
 
     def rotar_menos(self):
-        if self.rotacion > -3:
-            self.rotacion -= 1
-            self.rot_label.config(text=f"Rotar: {self.rotacion:+d}")
+        self._rotar_seleccion(-1)
 
     def get_midi_ports(self):
         if mido is None:
@@ -85,7 +114,11 @@ class MidiApp(tk.Tk):
             return
         try:
             midi_obj = procesa_midi(
-                "reference_comping.mid", cifrado, rotacion=self.rotacion, save=False
+                "reference_comping.mid",
+                cifrado,
+                rotacion=self.rotacion,
+                rotaciones=self.rotaciones_forzadas,
+                save=False,
             )
             import io
 
@@ -108,7 +141,12 @@ class MidiApp(tk.Tk):
             messagebox.showerror("Error", "No se encontró 'reference_comping.mid' en esta carpeta.")
             return
         try:
-            out_path = procesa_midi("reference_comping.mid", cifrado, rotacion=self.rotacion)
+            out_path = procesa_midi(
+                "reference_comping.mid",
+                cifrado,
+                rotacion=self.rotacion,
+                rotaciones=self.rotaciones_forzadas,
+            )
             print(f"Archivo exportado: {out_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
