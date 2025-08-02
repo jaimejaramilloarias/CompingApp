@@ -3,6 +3,13 @@ from tkinter import messagebox, ttk
 import os
 from procesa_midi import procesa_midi
 
+# Colores y fuente para un aspecto moderno
+BACKGROUND = "#2b2b2b"
+FOREGROUND = "#f5f5f5"
+ACCENT = "#4e9af1"
+ENTRY_BACKGROUND = "#3c3f41"
+FONT = ("Helvetica", 10)
+
 try:
     import mido
 except Exception:  # pragma: no cover - mido no es esencial para las pruebas
@@ -13,44 +20,120 @@ class MidiApp(tk.Tk):
         super().__init__()
         self.title("Comping MIDI Exporter")
         self.geometry("560x270")
+        self.configure(bg=BACKGROUND)
 
-        self.cifrado_label = tk.Label(self, text="Cifrado (usa | para separar compases):")
+        self.cifrado_label = tk.Label(
+            self,
+            text="Cifrado (usa | para separar compases):",
+            bg=BACKGROUND,
+            fg=FOREGROUND,
+            font=FONT,
+        )
         self.cifrado_label.pack(pady=5)
-        self.cifrado_entry = tk.Text(self, width=65, height=3)
+        self.cifrado_entry = tk.Text(
+            self,
+            width=65,
+            height=3,
+            bg=ENTRY_BACKGROUND,
+            fg=FOREGROUND,
+            insertbackground=FOREGROUND,
+            font=FONT,
+        )
         self.cifrado_entry.pack()
 
-        self.midi_label = tk.Label(self, text="Archivo MIDI de referencia: reference_comping.mid")
+        self.midi_label = tk.Label(
+            self,
+            text="Archivo MIDI de referencia: reference_comping.mid",
+            bg=BACKGROUND,
+            fg=FOREGROUND,
+            font=FONT,
+        )
         self.midi_label.pack(pady=10)
 
         self.rotacion = 0
         # Rotaciones individuales por acorde (índice de corchea -> rotación)
         self.rotaciones_forzadas = {}
-        self.rot_label = tk.Label(self, text="Rotar: 0")
+        self.rot_label = tk.Label(self, text="Rotar: 0", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
         self.rot_label.pack()
-        self.rot_frame = tk.Frame(self)
+        self.rot_frame = tk.Frame(self, bg=BACKGROUND)
         self.rot_frame.pack(pady=5)
-        self.rot_minus = tk.Button(self.rot_frame, text="-", command=self.rotar_menos)
+        self.rot_minus = tk.Button(
+            self.rot_frame,
+            text="-",
+            command=self.rotar_menos,
+            bg=ACCENT,
+            fg=FOREGROUND,
+            activebackground="#3a7bd5",
+            activeforeground=FOREGROUND,
+            font=FONT,
+        )
         self.rot_minus.pack(side="left")
-        self.rot_plus = tk.Button(self.rot_frame, text="+", command=self.rotar_mas)
+        self.rot_plus = tk.Button(
+            self.rot_frame,
+            text="+",
+            command=self.rotar_mas,
+            bg=ACCENT,
+            fg=FOREGROUND,
+            activebackground="#3a7bd5",
+            activeforeground=FOREGROUND,
+            font=FONT,
+        )
         self.rot_plus.pack(side="left")
 
-        self.reset_btn = tk.Button(self, text="Reestablecer", command=self.reset_rotaciones)
+        self.reset_btn = tk.Button(
+            self,
+            text="Reestablecer",
+            command=self.reset_rotaciones,
+            bg=ACCENT,
+            fg=FOREGROUND,
+            activebackground="#3a7bd5",
+            activeforeground=FOREGROUND,
+            font=FONT,
+        )
         self.reset_btn.pack(pady=5)
 
         self.spread_var = tk.BooleanVar(value=False)
-        self.spread_btn = tk.Checkbutton(self, text="Spread", variable=self.spread_var)
+        self.spread_btn = tk.Checkbutton(
+            self,
+            text="Spread",
+            variable=self.spread_var,
+            bg=BACKGROUND,
+            fg=FOREGROUND,
+            selectcolor=BACKGROUND,
+            activebackground=BACKGROUND,
+            activeforeground=FOREGROUND,
+            font=FONT,
+        )
         self.spread_btn.pack(pady=5)
 
-        self.port_label = tk.Label(self, text="Puerto MIDI de salida:")
+        self.port_label = tk.Label(self, text="Puerto MIDI de salida:", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
         self.port_label.pack(pady=5)
-        self.port_combo = ttk.Combobox(self, state="readonly")
+        self.port_combo = ttk.Combobox(self, state="readonly", font=FONT)
         self.port_combo.pack()
         self.refresh_ports()
 
-        self.preview_btn = tk.Button(self, text="Previsualizar", command=self.preview_midi)
+        self.preview_btn = tk.Button(
+            self,
+            text="Previsualizar",
+            command=self.preview_midi,
+            bg=ACCENT,
+            fg=FOREGROUND,
+            activebackground="#3a7bd5",
+            activeforeground=FOREGROUND,
+            font=FONT,
+        )
         self.preview_btn.pack(pady=10)
 
-        self.export_btn = tk.Button(self, text="Exportar MIDI", command=self.export_midi)
+        self.export_btn = tk.Button(
+            self,
+            text="Exportar MIDI",
+            command=self.export_midi,
+            bg=ACCENT,
+            fg=FOREGROUND,
+            activebackground="#3a7bd5",
+            activeforeground=FOREGROUND,
+            font=FONT,
+        )
         self.export_btn.pack(pady=5)
 
     def _rotar_seleccion(self, delta):
