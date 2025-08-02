@@ -1,5 +1,6 @@
 import os
 import itertools
+from pathlib import Path
 from acordes_dict import acordes
 from cifrado_utils import analizar_cifrado
 
@@ -185,6 +186,23 @@ def enlazar_notas(previas, nuevas):
 
     return list(mejor_asignacion)
 
+
+def evitar_solapamientos(notas, margen=0.01):
+    """Acorta una nota si la siguiente tiene la misma altura.
+
+    Recorre ``notas`` en orden temporal y, cuando dos notas consecutivas
+    comparten ``pitch`` y la primera se extiende más allá del inicio de la
+    segunda, reduce la duración de la primera para que finalice un pequeño
+    margen antes de la siguiente.  El ``margen`` se expresa en segundos.
+    """
+    notas.sort(key=lambda n: n.start)
+    for actual, siguiente in zip(notas, notas[1:]):
+        if actual.pitch == siguiente.pitch and actual.end > siguiente.start:
+            nuevo_fin = min(actual.end, siguiente.start - margen)
+            if nuevo_fin < actual.start:
+                nuevo_fin = actual.start
+            actual.end = nuevo_fin
+
 def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corcheas_por_compas=8, dur_corchea=0.25, rotacion=0):
     import pretty_midi
     from collections import defaultdict
@@ -252,6 +270,7 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
             nota.pitch = altura
 
     notas_finales = [n for n in notas if tiempo_inicio <= n.start < tiempo_fin]
+    evitar_solapamientos(notas_finales)
 
     if rotacion:
         grupos = defaultdict(list)
@@ -270,7 +289,14 @@ def procesa_midi(reference_midi_path="reference_comping.mid", cifrado="", corche
 
     pista.notes = notas_finales
 
-    out_name = os.path.splitext(os.path.basename(reference_midi_path))[0] + "_export.mid"
-    midi.write(out_name)
-    print(f"Archivo exportado: {out_name}")
-    return out_name
+    out_dir = Path.home() / "Desktop" / "output"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    indices = [int(p.stem) for p in out_dir.glob("*.mid") if p.stem.isdigit()]
+    next_idx = max(indices, default=0) + 1
+    out_path = out_dir / f"{next_idx}.mid"
+    midi.write(str(out_path))
+    print(f"Archivo exportado: {out_path}")
+    archivos = sorted(out_dir.glob("*.mid"), key=lambda p: int(p.stem))
+    for p in archivos:
+        print(p.name)
+    return str(out_path)

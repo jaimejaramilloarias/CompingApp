@@ -50,7 +50,7 @@ class MidiApp(tk.Tk):
             return
         try:
             out_path = procesa_midi("reference_comping.mid", cifrado, rotacion=self.rotacion)
-            messagebox.showinfo("¡Listo!", f"Archivo exportado:\n{out_path}")
+            print(f"Archivo exportado: {out_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error:\n{e}")
 
