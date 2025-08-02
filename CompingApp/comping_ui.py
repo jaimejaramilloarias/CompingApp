@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 import os
-from procesa_midi import procesa_midi
+from procesa_midi import procesa_midi, notas_midi_acorde, notas_naturales
+from cifrado_utils import analizar_cifrado
 
 # Colores y fuente para un aspecto moderno
 BACKGROUND = "#2b2b2b"
@@ -56,6 +57,8 @@ class MidiApp(tk.Tk):
         # Rotaciones individuales por acorde (índice de corchea -> rotación)
         self.rotaciones_forzadas = {}
         self.chords = []
+        # Inversiones base calculadas a partir de la nota más grave de cada acorde
+        self.base_inversions = []
         self.rot_label = tk.Label(self, text="Rotar: 0", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
         self.rot_label.pack()
         self.rot_frame = tk.Frame(self, bg=BACKGROUND)
@@ -154,56 +157,51 @@ class MidiApp(tk.Tk):
         self.export_btn.pack(pady=5)
 
     def _rotar_seleccion(self, delta):
-        """Rota los acordes seleccionados en ``cifrado_entry``.
-
-        Si no hay selección, se ajusta la rotación global.
-        ``delta`` debe ser ``+1`` o ``-1``.
-        """
-        try:
-            sel_start = self.cifrado_entry.index("sel.first")
-            sel_end = self.cifrado_entry.index("sel.last")
-        except tk.TclError:
-            sel_start = sel_end = None
-
-        if sel_start and sel_end:
-            if not self._seleccion_de_acordes_completa(sel_start, sel_end):
-                sel_start = sel_end = None
-
-        if sel_start and sel_end:
-            antes = self.cifrado_entry.get("1.0", sel_start)
-            seleccion = self.cifrado_entry.get(sel_start, sel_end)
-            n_antes = len([c for c in antes.replace("|", " ").split() if c])
-            chords_sel = [c for c in seleccion.replace("|", " ").split() if c]
-            for i in range(len(chords_sel)):
-                idx = n_antes + i
-                actual = self.rotaciones_forzadas.get(idx, 0) + delta
-                if -3 <= actual <= 3:
-                    if actual:
-                        self.rotaciones_forzadas[idx] = actual
-                    elif idx in self.rotaciones_forzadas:
-                        del self.rotaciones_forzadas[idx]
-        else:
-            nueva = self.rotacion + delta
-            if -3 <= nueva <= 3:
-                self.rotacion = nueva
-                self.rot_label.config(text=f"Rotar: {self.rotacion:+d}")
+        """Ajusta la rotación global de todos los acordes."""
+        nueva = self.rotacion + delta
+        if -3 <= nueva <= 3:
+            self.rotacion = nueva
+            self.rot_label.config(text=f"Rotar: {self.rotacion:+d}")
         self.update_inversion_display()
-    def _seleccion_de_acordes_completa(self, start, end):
-        if not self.cifrado_entry.compare(start, "==", "1.0"):
-            prev = self.cifrado_entry.get(f"{start} -1c")
-            if prev not in (" ", "|", "\n"):
-                return False
-        if not self.cifrado_entry.compare(end, "==", "end") and not self.cifrado_entry.compare(end, "==", "end-1c"):
-            after = self.cifrado_entry.get(end)
-            if after not in (" ", "|", "\n"):
-                return False
-        return True
 
     def reset_rotaciones(self):
         self.rotacion = 0
         self.rotaciones_forzadas.clear()
         self.rot_label.config(text="Rotar: 0")
         self.update_inversion_display()
+
+    def calcular_inversiones(self):
+        """Calcula la inversión base de cada acorde según su nota más grave."""
+        self.base_inversions = []
+        prev_bajo = None
+        cache = {}
+        for acorde in self.chords:
+            if acorde not in cache:
+                cache[acorde] = analizar_cifrado(acorde)[0]
+            fundamental, grados = cache[acorde]
+            if prev_bajo is None:
+                inv_escogida = 0
+                notas = None
+                for inv in range(4):
+                    cand = notas_midi_acorde(
+                        fundamental, grados, base_octava=4, prev_bajo=None, inversion=inv
+                    )
+                    notas = cand
+                    if cand[0] >= 57:
+                        inv_escogida = inv
+                        break
+                prev_bajo = notas[0]
+                self.base_inversions.append(inv_escogida)
+            else:
+                notas = notas_midi_acorde(
+                    fundamental, grados, base_octava=4, prev_bajo=prev_bajo
+                )
+                prev_bajo = notas[0]
+                base = 48 + notas_naturales.get(fundamental, 0)
+                diff = (notas[0] - base) % 12
+                grados_mod = [g % 12 for g in grados]
+                inv_idx = grados_mod.index(diff) if diff in grados_mod else 0
+                self.base_inversions.append(inv_idx)
 
     def update_chord_list(self):
         text = self.cifrado_entry.get("1.0", tk.END)
@@ -212,6 +210,7 @@ class MidiApp(tk.Tk):
         self.rotaciones_forzadas = {
             i: r for i, r in self.rotaciones_forzadas.items() if i < len(chords)
         }
+        self.calcular_inversiones()
         display = [f"{i+1}: {c}" for i, c in enumerate(chords)]
         self.chord_combo["values"] = display
         if display:
@@ -232,7 +231,8 @@ class MidiApp(tk.Tk):
         desired = self.inv_combo.current()
         if desired < 0:
             return
-        offset = desired - self.rotacion
+        base = self.base_inversions[idx] if idx < len(self.base_inversions) else 0
+        offset = desired - (self.rotacion + base)
         if offset:
             self.rotaciones_forzadas[idx] = offset
         elif idx in self.rotaciones_forzadas:
@@ -241,7 +241,8 @@ class MidiApp(tk.Tk):
     def update_inversion_display(self):
         idx = self.chord_combo.current()
         if 0 <= idx < len(self.chords):
-            rot = self.rotacion + self.rotaciones_forzadas.get(idx, 0)
+            base = self.base_inversions[idx] if idx < len(self.base_inversions) else 0
+            rot = base + self.rotacion + self.rotaciones_forzadas.get(idx, 0)
             self.inv_combo.current(rot % 4)
 
     def rotar_mas(self):
