@@ -252,6 +252,31 @@ def aplicar_rotaciones(notas, rotacion=0, rotaciones=None):
 
     return notas
 
+
+def Spread(notas):
+    """Duplica la segunda nota de cada acorde una y dos octavas arriba."""
+
+    grupos = defaultdict(list)
+    for n in notas:
+        grupos[n.start].append(n)
+
+    nuevas = []
+    for grupo in grupos.values():
+        if len(grupo) < 2:
+            continue
+        segunda = sorted(grupo, key=lambda n: n.pitch)[1]
+        cls = segunda.__class__
+        for desplazamiento in (12, 24):
+            nueva = cls(
+                velocity=getattr(segunda, "velocity", 0),
+                pitch=segunda.pitch + desplazamiento,
+                start=segunda.start,
+                end=segunda.end,
+            )
+            nuevas.append(nueva)
+    notas.extend(nuevas)
+    return notas
+
 def procesa_midi(
     reference_midi_path="reference_comping.mid",
     cifrado="",
@@ -259,15 +284,17 @@ def procesa_midi(
     dur_corchea=0.25,
     rotacion=0,
     rotaciones=None,
+    spread=False,
     save=True,
 ):
     """Genera un archivo MIDI con el cifrado indicado.
 
-    Si ``save`` es ``True`` (valor por defecto) el resultado se escribe en un
-    archivo dentro de ``~/Desktop/output`` y se devuelve la ruta al mismo.  Si
-    ``save`` es ``False`` se devuelve el objeto ``PrettyMIDI`` resultante sin
-    persistirlo en disco, lo cual permite previsualizar el MIDI antes de
-    exportarlo definitivamente.
+    Si ``spread`` es ``True`` se duplica la segunda nota de cada acorde una y dos
+    octavas por encima.  Cuando ``save`` es ``True`` (valor por defecto) el
+    resultado se escribe en un archivo dentro de ``~/Desktop/output`` y se
+    devuelve la ruta al mismo.  Si ``save`` es ``False`` se devuelve el objeto
+    ``PrettyMIDI`` resultante sin persistirlo en disco, lo cual permite
+    previsualizar el MIDI antes de exportarlo definitivamente.
     """
     import pretty_midi
 
@@ -341,6 +368,8 @@ def procesa_midi(
     evitar_solapamientos(notas_finales)
 
     aplicar_rotaciones(notas_finales, rotacion, rotaciones)
+    if spread:
+        Spread(notas_finales)
 
     pista.notes = notas_finales
 
