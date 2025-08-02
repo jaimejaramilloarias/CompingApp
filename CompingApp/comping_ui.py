@@ -6,12 +6,13 @@ from procesa_midi import procesa_midi, notas_midi_acorde, notas_naturales
 from cifrado_utils import analizar_cifrado
 
 # Colores y fuente para un aspecto moderno
-BACKGROUND = "#2b2b2b"
-FOREGROUND = "#f5f5f5"
-# Color oscuro para botones y entradas
-ACCENT = "#3c3f41"
-ENTRY_BACKGROUND = "#3c3f41"
-FONT = ("Helvetica", 20)
+BACKGROUND = "#202124"  # fondo general muy oscuro
+PANEL_BG = "#27282c"  # paneles y frames
+FOREGROUND = "#fafafa"  # texto principal
+SECONDARY_FOREGROUND = "#bdbdbd"  # texto secundario
+ACCENT = "#ff9800"  # color de acento
+ENTRY_BACKGROUND = "#23252b"  # entradas de texto
+FONT = ("Monaco", 18)
 
 try:
     import mido
@@ -22,16 +23,21 @@ class MidiApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Comping MIDI Exporter")
-        self.geometry("560x360")
+        self.geometry("1100x650")
         self.configure(bg=BACKGROUND)
+
         # Apariencia
         self.bg_color = BACKGROUND
+        self.panel_bg_color = PANEL_BG
         self.fg_color = FOREGROUND
+        self.secondary_fg_color = SECONDARY_FOREGROUND
         self.accent_color = ACCENT
         self.entry_bg_color = ENTRY_BACKGROUND
-        self.font_family = "Helvetica"
-        self.font_size = 20
+        self.font_family = FONT[0]
+        self.font_size = FONT[1]
         self.font = (self.font_family, self.font_size)
+        self.header_font = (self.font_family, 36)
+        self.secondary_labels = set()
 
         # Menú de apariencia
         self.menu_bar = tk.Menu(self)
@@ -50,48 +56,71 @@ class MidiApp(tk.Tk):
             fieldbackground=self.entry_bg_color,
             background=self.entry_bg_color,
             foreground=self.fg_color,
+            arrowcolor=self.fg_color,
         )
 
-        self.cifrado_label = tk.Label(
+        # Cabecera
+        self.header_label = tk.Label(
             self,
+            text="CompingApp - Jaramillo",
+            bg=self.bg_color,
+            fg=self.accent_color,
+            font=self.header_font,
+        )
+        self.header_label.grid(row=0, column=0, columnspan=2, pady=(10, 20))
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+
+        # Paneles
+        self.left_panel = tk.Frame(self, bg=self.panel_bg_color)
+        self.left_panel.grid(row=1, column=0, padx=20, pady=10, sticky="n")
+        self.right_panel = tk.Frame(self, bg=self.panel_bg_color)
+        self.right_panel.grid(row=1, column=1, padx=20, pady=10, sticky="n")
+
+        # ---- Panel izquierdo ----
+        self.cifrado_label = tk.Label(
+            self.left_panel,
             text="Cifrado (usa | para separar compases):",
-            bg=BACKGROUND,
-            fg=FOREGROUND,
-            font=FONT,
+            bg=self.panel_bg_color,
+            fg=self.fg_color,
+            font=self.font,
         )
         self.cifrado_label.pack(pady=5)
         self.cifrado_entry = tk.Text(
-            self,
-            width=65,
-            height=3,
-            bg=ENTRY_BACKGROUND,
-            fg=FOREGROUND,
-            insertbackground=FOREGROUND,
-            font=FONT,
+            self.left_panel,
+            width=45,
+            height=5,
+            bg=self.entry_bg_color,
+            fg=self.fg_color,
+            insertbackground=self.fg_color,
+            font=self.font,
         )
-        self.cifrado_entry.pack()
+        self.cifrado_entry.pack(fill="x", padx=10)
         self.cifrado_entry.bind("<KeyRelease>", lambda e: self.update_chord_list())
 
         self.reference_midi_path = "reference_comping.mid"
         self.midi_label = tk.Label(
-            self,
+            self.left_panel,
             text=f"Archivo MIDI de referencia: {os.path.basename(self.reference_midi_path)}",
-            bg=BACKGROUND,
-            fg=FOREGROUND,
-            font=FONT,
+            bg=self.panel_bg_color,
+            fg=self.secondary_fg_color,
+            font=self.font,
         )
         self.midi_label.pack(pady=5)
+        self.secondary_labels.add(self.midi_label)
         self.midi_btn = tk.Button(
-            self,
+            self.left_panel,
             text="Cargar MIDI",
             command=self.load_midi,
-            bg=ACCENT,
-            fg=FOREGROUND,
-            activebackground=ACCENT,
-            activeforeground=FOREGROUND,
-            font=FONT,
+            bg=self.accent_color,
+            fg=self.bg_color,
+            activebackground=self.accent_color,
+            activeforeground=self.bg_color,
+            font=(self.font_family, self.font_size, "bold"),
+            relief="flat",
+            bd=0,
         )
-        self.midi_btn.pack(pady=5)
+        self.midi_btn.pack(pady=5, fill="x", padx=10)
 
         self.rotacion = 0
         # Rotaciones individuales por acorde (índice de corchea -> rotación)
@@ -101,132 +130,187 @@ class MidiApp(tk.Tk):
         self.chords = []
         # Inversiones base calculadas a partir de la nota más grave de cada acorde
         self.base_inversions = []
-        self.rot_label = tk.Label(self, text="Rotar: 0", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
+        self.rot_label = tk.Label(
+            self.left_panel,
+            text="Rotar: 0",
+            bg=self.panel_bg_color,
+            fg=self.fg_color,
+            font=self.font,
+        )
         self.rot_label.pack()
-        self.rot_frame = tk.Frame(self, bg=BACKGROUND)
+        self.rot_frame = tk.Frame(self.left_panel, bg=self.panel_bg_color)
         self.rot_frame.pack(pady=5)
         self.rot_minus = tk.Button(
             self.rot_frame,
             text="-",
             command=self.rotar_menos,
-            bg=ACCENT,
-            fg=FOREGROUND,
-            activebackground=ACCENT,
-            activeforeground=FOREGROUND,
-            font=FONT,
+            bg=self.accent_color,
+            fg=self.bg_color,
+            activebackground=self.accent_color,
+            activeforeground=self.bg_color,
+            font=(self.font_family, self.font_size, "bold"),
+            relief="flat",
+            bd=0,
+            width=4,
         )
-        self.rot_minus.pack(side="left")
+        self.rot_minus.pack(side="left", padx=5)
         self.rot_plus = tk.Button(
             self.rot_frame,
             text="+",
             command=self.rotar_mas,
-            bg=ACCENT,
-            fg=FOREGROUND,
-            activebackground=ACCENT,
-            activeforeground=FOREGROUND,
-            font=FONT,
+            bg=self.accent_color,
+            fg=self.bg_color,
+            activebackground=self.accent_color,
+            activeforeground=self.bg_color,
+            font=(self.font_family, self.font_size, "bold"),
+            relief="flat",
+            bd=0,
+            width=4,
         )
-        self.rot_plus.pack(side="left")
+        self.rot_plus.pack(side="left", padx=5)
 
         self.reset_btn = tk.Button(
-            self,
+            self.left_panel,
             text="Reestablecer",
             command=self.reset_rotaciones,
-            bg=ACCENT,
-            fg=FOREGROUND,
-            activebackground=ACCENT,
-            activeforeground=FOREGROUND,
-            font=FONT,
+            bg=self.accent_color,
+            fg=self.bg_color,
+            activebackground=self.accent_color,
+            activeforeground=self.bg_color,
+            font=(self.font_family, self.font_size, "bold"),
+            relief="flat",
+            bd=0,
         )
-        self.reset_btn.pack(pady=5)
+        self.reset_btn.pack(pady=5, fill="x", padx=10)
 
-        self.chord_label = tk.Label(self, text="Acorde:", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
+        self.spread_var = tk.BooleanVar(value=False)
+        self.spread_btn = tk.Checkbutton(
+            self.left_panel,
+            text="Spread",
+            variable=self.spread_var,
+            bg=self.panel_bg_color,
+            fg=self.fg_color,
+            selectcolor=self.accent_color,
+            activebackground=self.panel_bg_color,
+            activeforeground=self.fg_color,
+            font=self.font,
+        )
+        self.spread_btn.pack(pady=5)
+
+        # ---- Panel derecho ----
+        self.chord_label = tk.Label(
+            self.right_panel,
+            text="Acorde:",
+            bg=self.panel_bg_color,
+            fg=self.fg_color,
+            font=self.font,
+        )
         self.chord_label.pack(pady=5)
-        self.chord_combo = ttk.Combobox(self, state="readonly", font=FONT)
+        self.chord_combo = ttk.Combobox(self.right_panel, state="readonly", font=self.font)
         self.chord_combo.bind("<<ComboboxSelected>>", self.on_chord_selected)
-        self.chord_combo.pack()
+        self.chord_combo.pack(fill="x", padx=10)
 
-        self.inv_label = tk.Label(self, text="Inversión:", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
+        self.inv_label = tk.Label(
+            self.right_panel,
+            text="Inversión:",
+            bg=self.panel_bg_color,
+            fg=self.fg_color,
+            font=self.font,
+        )
         self.inv_label.pack(pady=5)
         self.inv_options = ["Fundamental", "1ª inversión", "2ª inversión", "3ª inversión"]
-        self.inv_frame = tk.Frame(self, bg=BACKGROUND)
+        self.inv_frame = tk.Frame(self.right_panel, bg=self.panel_bg_color)
         self.inv_frame.pack()
-        self.inv_combo = ttk.Combobox(self.inv_frame, state="readonly", values=self.inv_options, font=FONT)
+        self.inv_combo = ttk.Combobox(
+            self.inv_frame,
+            state="readonly",
+            values=self.inv_options,
+            font=self.font,
+        )
         self.inv_combo.bind("<<ComboboxSelected>>", self.on_inv_selected)
         self.inv_combo.pack(side="left")
-        self.oct_frame = tk.Frame(self.inv_frame, bg=BACKGROUND)
+        self.oct_frame = tk.Frame(self.inv_frame, bg=self.panel_bg_color)
         self.oct_frame.pack(side="left", padx=5)
-        self.oct_label = tk.Label(self.oct_frame, text="Octavar", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
+        self.oct_label = tk.Label(
+            self.oct_frame,
+            text="Octavar",
+            bg=self.panel_bg_color,
+            fg=self.fg_color,
+            font=self.font,
+        )
         self.oct_label.pack()
-        self.oct_btns = tk.Frame(self.oct_frame, bg=BACKGROUND)
+        self.oct_btns = tk.Frame(self.oct_frame, bg=self.panel_bg_color)
         self.oct_btns.pack()
         self.oct_minus = tk.Button(
             self.oct_btns,
             text="-",
             command=self.octavar_menos,
-            bg=ACCENT,
-            fg=FOREGROUND,
-            activebackground=ACCENT,
-            activeforeground=FOREGROUND,
-            font=FONT,
+            bg=self.accent_color,
+            fg=self.bg_color,
+            activebackground=self.accent_color,
+            activeforeground=self.bg_color,
+            font=(self.font_family, self.font_size, "bold"),
+            relief="flat",
+            bd=0,
+            width=4,
         )
-        self.oct_minus.pack(side="left")
+        self.oct_minus.pack(side="left", padx=5)
         self.oct_plus = tk.Button(
             self.oct_btns,
             text="+",
             command=self.octavar_mas,
-            bg=ACCENT,
-            fg=FOREGROUND,
-            activebackground=ACCENT,
-            activeforeground=FOREGROUND,
-            font=FONT,
+            bg=self.accent_color,
+            fg=self.bg_color,
+            activebackground=self.accent_color,
+            activeforeground=self.bg_color,
+            font=(self.font_family, self.font_size, "bold"),
+            relief="flat",
+            bd=0,
+            width=4,
         )
-        self.oct_plus.pack(side="left")
+        self.oct_plus.pack(side="left", padx=5)
+
         self.update_chord_list()
 
-        self.spread_var = tk.BooleanVar(value=False)
-        self.spread_btn = tk.Checkbutton(
-            self,
-            text="Spread",
-            variable=self.spread_var,
-            bg=ACCENT,
-            fg=FOREGROUND,
-            selectcolor=ACCENT,
-            activebackground=ACCENT,
-            activeforeground=FOREGROUND,
-            font=FONT,
+        self.port_label = tk.Label(
+            self.right_panel,
+            text="Puerto MIDI de salida:",
+            bg=self.panel_bg_color,
+            fg=self.fg_color,
+            font=self.font,
         )
-        self.spread_btn.pack(pady=5)
-
-        self.port_label = tk.Label(self, text="Puerto MIDI de salida:", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
         self.port_label.pack(pady=5)
-        self.port_combo = ttk.Combobox(self, state="readonly", font=FONT)
-        self.port_combo.pack()
+        self.port_combo = ttk.Combobox(self.right_panel, state="readonly", font=self.font)
+        self.port_combo.pack(fill="x", padx=10)
         self.refresh_ports()
 
         self.preview_btn = tk.Button(
-            self,
+            self.right_panel,
             text="Previsualizar",
             command=self.preview_midi,
-            bg=ACCENT,
-            fg=FOREGROUND,
-            activebackground=ACCENT,
-            activeforeground=FOREGROUND,
-            font=FONT,
+            bg=self.accent_color,
+            fg=self.bg_color,
+            activebackground=self.accent_color,
+            activeforeground=self.bg_color,
+            font=(self.font_family, self.font_size, "bold"),
+            relief="flat",
+            bd=0,
         )
-        self.preview_btn.pack(pady=10)
+        self.preview_btn.pack(pady=10, fill="x", padx=10)
 
         self.export_btn = tk.Button(
-            self,
+            self.right_panel,
             text="Exportar MIDI",
             command=self.export_midi,
-            bg=ACCENT,
-            fg=FOREGROUND,
-            activebackground=ACCENT,
-            activeforeground=FOREGROUND,
-            font=FONT,
+            bg=self.accent_color,
+            fg=self.bg_color,
+            activebackground=self.accent_color,
+            activeforeground=self.bg_color,
+            font=(self.font_family, self.font_size, "bold"),
+            relief="flat",
+            bd=0,
         )
-        self.export_btn.pack(pady=5)
+        self.export_btn.pack(pady=5, fill="x", padx=10)
 
         self.apply_styles()
 
@@ -491,7 +575,9 @@ class MidiApp(tk.Tk):
         )
         color_frame.pack(fill="both", expand=True, padx=10, pady=10)
         self._add_color_selector(color_frame, "Fondo", "bg_color")
+        self._add_color_selector(color_frame, "Panel", "panel_bg_color")
         self._add_color_selector(color_frame, "Texto", "fg_color")
+        self._add_color_selector(color_frame, "Texto secundario", "secondary_fg_color")
         self._add_color_selector(color_frame, "Botones", "accent_color")
         self._add_color_selector(color_frame, "Entrada", "entry_bg_color")
 
@@ -518,34 +604,45 @@ class MidiApp(tk.Tk):
     def set_font_family(self, family):
         self.font_family = family
         self.font = (self.font_family, self.font_size)
+        self.header_font = (self.font_family, self.font_size + 18)
         self.apply_styles()
 
     def set_font_size(self, size):
         self.font_size = size
         self.font = (self.font_family, self.font_size)
+        self.header_font = (self.font_family, self.font_size + 18)
         self.apply_styles()
 
     def apply_styles(self):
         self.configure(bg=self.bg_color)
+        self.header_label.configure(
+            bg=self.bg_color, fg=self.accent_color, font=self.header_font
+        )
         self.style.configure(
             "TCombobox",
             fieldbackground=self.entry_bg_color,
             background=self.entry_bg_color,
             foreground=self.fg_color,
+            arrowcolor=self.fg_color,
         )
-        for child in self.winfo_children():
-            self._style_widget(child)
+        for panel in (self.left_panel, self.right_panel):
+            panel.configure(bg=self.panel_bg_color)
+            for child in panel.winfo_children():
+                self._style_widget(child)
 
     def _style_widget(self, widget):
         if isinstance(widget, tk.Label):
-            widget.configure(bg=self.bg_color, fg=self.fg_color, font=self.font)
+            fg = self.secondary_fg_color if widget in self.secondary_labels else self.fg_color
+            widget.configure(bg=self.panel_bg_color, fg=fg, font=self.font)
         elif isinstance(widget, tk.Button):
             widget.configure(
                 bg=self.accent_color,
-                fg=self.fg_color,
+                fg=self.bg_color,
                 activebackground=self.accent_color,
-                activeforeground=self.fg_color,
-                font=self.font,
+                activeforeground=self.bg_color,
+                font=(self.font_family, self.font_size, "bold"),
+                relief="flat",
+                bd=0,
             )
         elif isinstance(widget, tk.Text):
             widget.configure(
@@ -553,15 +650,17 @@ class MidiApp(tk.Tk):
                 fg=self.fg_color,
                 insertbackground=self.fg_color,
                 font=self.font,
+                relief="flat",
+                bd=0,
             )
         elif isinstance(widget, tk.Frame):
-            widget.configure(bg=self.bg_color)
+            widget.configure(bg=self.panel_bg_color)
         elif isinstance(widget, tk.Checkbutton):
             widget.configure(
-                bg=self.accent_color,
+                bg=self.panel_bg_color,
                 fg=self.fg_color,
                 selectcolor=self.accent_color,
-                activebackground=self.accent_color,
+                activebackground=self.panel_bg_color,
                 activeforeground=self.fg_color,
                 font=self.font,
             )
