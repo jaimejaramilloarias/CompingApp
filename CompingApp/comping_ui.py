@@ -20,7 +20,7 @@ class MidiApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Comping MIDI Exporter")
-        self.geometry("560x270")
+        self.geometry("560x360")
         self.configure(bg=BACKGROUND)
 
         self.cifrado_label = tk.Label(
@@ -41,6 +41,7 @@ class MidiApp(tk.Tk):
             font=FONT,
         )
         self.cifrado_entry.pack()
+        self.cifrado_entry.bind("<KeyRelease>", lambda e: self.update_chord_list())
 
         self.midi_label = tk.Label(
             self,
@@ -54,6 +55,7 @@ class MidiApp(tk.Tk):
         self.rotacion = 0
         # Rotaciones individuales por acorde (índice de corchea -> rotación)
         self.rotaciones_forzadas = {}
+        self.chords = []
         self.rot_label = tk.Label(self, text="Rotar: 0", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
         self.rot_label.pack()
         self.rot_frame = tk.Frame(self, bg=BACKGROUND)
@@ -92,6 +94,20 @@ class MidiApp(tk.Tk):
             font=FONT,
         )
         self.reset_btn.pack(pady=5)
+
+        self.chord_label = tk.Label(self, text="Acorde:", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
+        self.chord_label.pack(pady=5)
+        self.chord_combo = ttk.Combobox(self, state="readonly", font=FONT)
+        self.chord_combo.bind("<<ComboboxSelected>>", self.on_chord_selected)
+        self.chord_combo.pack()
+
+        self.inv_label = tk.Label(self, text="Inversión:", bg=BACKGROUND, fg=FOREGROUND, font=FONT)
+        self.inv_label.pack(pady=5)
+        self.inv_options = ["Fundamental", "1ª inversión", "2ª inversión", "3ª inversión"]
+        self.inv_combo = ttk.Combobox(self, state="readonly", values=self.inv_options, font=FONT)
+        self.inv_combo.bind("<<ComboboxSelected>>", self.on_inv_selected)
+        self.inv_combo.pack()
+        self.update_chord_list()
 
         self.spread_var = tk.BooleanVar(value=False)
         self.spread_btn = tk.Checkbutton(
@@ -171,7 +187,7 @@ class MidiApp(tk.Tk):
             if -3 <= nueva <= 3:
                 self.rotacion = nueva
                 self.rot_label.config(text=f"Rotar: {self.rotacion:+d}")
-
+        self.update_inversion_display()
     def _seleccion_de_acordes_completa(self, start, end):
         if not self.cifrado_entry.compare(start, "==", "1.0"):
             prev = self.cifrado_entry.get(f"{start} -1c")
@@ -187,6 +203,46 @@ class MidiApp(tk.Tk):
         self.rotacion = 0
         self.rotaciones_forzadas.clear()
         self.rot_label.config(text="Rotar: 0")
+        self.update_inversion_display()
+
+    def update_chord_list(self):
+        text = self.cifrado_entry.get("1.0", tk.END)
+        chords = [a.strip() for a in text.replace("|", " ").split() if a.strip()]
+        self.chords = chords
+        self.rotaciones_forzadas = {
+            i: r for i, r in self.rotaciones_forzadas.items() if i < len(chords)
+        }
+        display = [f"{i+1}: {c}" for i, c in enumerate(chords)]
+        self.chord_combo["values"] = display
+        if display:
+            if self.chord_combo.current() < 0 or self.chord_combo.current() >= len(display):
+                self.chord_combo.current(0)
+            self.update_inversion_display()
+        else:
+            self.chord_combo.set("")
+            self.inv_combo.set("")
+
+    def on_chord_selected(self, event=None):
+        self.update_inversion_display()
+
+    def on_inv_selected(self, event=None):
+        idx = self.chord_combo.current()
+        if idx < 0:
+            return
+        desired = self.inv_combo.current()
+        if desired < 0:
+            return
+        offset = desired - self.rotacion
+        if offset:
+            self.rotaciones_forzadas[idx] = offset
+        elif idx in self.rotaciones_forzadas:
+            del self.rotaciones_forzadas[idx]
+
+    def update_inversion_display(self):
+        idx = self.chord_combo.current()
+        if 0 <= idx < len(self.chords):
+            rot = self.rotacion + self.rotaciones_forzadas.get(idx, 0)
+            self.inv_combo.current(rot % 4)
 
     def rotar_mas(self):
         self._rotar_seleccion(1)
