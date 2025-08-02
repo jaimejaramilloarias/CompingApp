@@ -33,3 +33,18 @@ def test_rotacion_por_acorde():
     grupos = group_pitches(notas)
     assert grupos[0] == [60, 64, 67, 72]
     assert grupos[1] == [65, 68, 73, 73]
+
+
+def test_rotacion_forzada_duracion_completa():
+    notas = []
+    for i in range(4):
+        notas.extend([Note(60, i), Note(64, i), Note(67, i), Note(72, i)])
+    for i in range(4, 8):
+        notas.extend([Note(61, i), Note(65, i), Note(68, i), Note(73, i)])
+    indices = [0] * 4 + [1] * 4
+    aplicar_rotaciones(notas, rotaciones={0: 1}, indices=indices, dur_corchea=1)
+    grupos = group_pitches(notas)
+    for i in range(4):
+        assert grupos[i] == [64, 67, 72, 72]
+    for i in range(4, 8):
+        assert grupos[i] == [61, 65, 68, 73]
