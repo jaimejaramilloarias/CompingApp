@@ -37,6 +37,10 @@ class MidiApp(tk.Tk):
         self.reset_btn = tk.Button(self, text="Reestablecer", command=self.reset_rotaciones)
         self.reset_btn.pack(pady=5)
 
+        self.spread_var = tk.BooleanVar(value=False)
+        self.spread_btn = tk.Checkbutton(self, text="Spread", variable=self.spread_var)
+        self.spread_btn.pack(pady=5)
+
         self.port_label = tk.Label(self, text="Puerto MIDI de salida:")
         self.port_label.pack(pady=5)
         self.port_combo = ttk.Combobox(self, state="readonly")
@@ -141,6 +145,7 @@ class MidiApp(tk.Tk):
                 cifrado,
                 rotacion=self.rotacion,
                 rotaciones=self.rotaciones_forzadas,
+                spread=self.spread_var.get(),
                 save=False,
             )
             import io
@@ -169,6 +174,7 @@ class MidiApp(tk.Tk):
                 cifrado,
                 rotacion=self.rotacion,
                 rotaciones=self.rotaciones_forzadas,
+                spread=self.spread_var.get(),
             )
             print(f"Archivo exportado: {out_path}")
         except Exception as e:
